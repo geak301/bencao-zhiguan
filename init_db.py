@@ -17,8 +17,10 @@ DB_NAME = "herb_management_system"
 
 
 def _load_conn_config():
-    """读取数据库连接：优先 DATABASE_URL（PaaS 平台），否则本机 root"""
+    """读取数据库连接：优先 DATABASE_URL/MYSQL_URL（PaaS 平台），否则本机 root"""
     db_url = os.environ.get("DATABASE_URL", "").strip()
+    if not db_url:
+        db_url = os.environ.get("MYSQL_URL", "").strip()
     if db_url:
         parsed = urllib.parse.urlparse(db_url)
         return {
@@ -29,11 +31,22 @@ def _load_conn_config():
             "database": parsed.path.lstrip("/") or DB_NAME,
             "charset": "utf8mb4",
         }
+    if os.environ.get("MYSQLHOST", "").strip():
+        # Railway MySQL 单变量模式
+        return {
+            "host": os.environ.get("MYSQLHOST", "127.0.0.1"),
+            "port": int(os.environ.get("MYSQLPORT", "3306")),
+            "user": os.environ.get("MYSQLUSER", "root"),
+            "password": os.environ.get("MYSQLPASSWORD", ""),
+            "database": os.environ.get("MYSQLDATABASE", DB_NAME),
+            "charset": "utf8mb4",
+        }
     return {
         "host": os.environ.get("DB_HOST", "127.0.0.1"),
         "port": int(os.environ.get("DB_PORT", "3306")),
         "user": os.environ.get("DB_USER", "root"),
-        "password": os.environ.get("DB_PASSWORD", "Z8023502z!"),
+        # 本机 MySQL 密码请通过环境变量 DB_PASSWORD 设置，或自行修改此处
+        "password": os.environ.get("DB_PASSWORD", "YOUR_MYSQL_PASSWORD"),
         "database": None,  # 本机模式下先不选库，建库后再 USE
         "charset": "utf8mb4",
     }

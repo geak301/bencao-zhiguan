@@ -4,8 +4,10 @@
 
 连接配置优先级：
 1. 环境变量 DATABASE_URL（Railway/Render 等 PaaS 平台自动注入，如 mysql://user:pass@host:port/dbname）
-2. 环境变量 DB_HOST / DB_PORT / DB_USER / DB_PASSWORD / DB_NAME
-3. 本机默认配置（127.0.0.1 / root / 本机密码）
+2. 环境变量 MYSQL_URL（Railway MySQL 模板注入的完整连接串，如 mysql://user:pass@host:port/dbname）
+3. 环境变量 MYSQLHOST / MYSQLPORT / MYSQLUSER / MYSQLPASSWORD / MYSQLDATABASE（Railway MySQL 单变量）
+4. 环境变量 DB_HOST / DB_PORT / DB_USER / DB_PASSWORD / DB_NAME
+5. 本机默认配置（127.0.0.1 / root / 本机密码）
 """
 import os
 import urllib.parse
@@ -28,14 +30,26 @@ def _parse_database_url(url):
 def get_db_config():
     """根据环境变量返回数据库连接配置"""
     db_url = os.environ.get("DATABASE_URL", "").strip()
+    if not db_url:
+        db_url = os.environ.get("MYSQL_URL", "").strip()
     if db_url:
         cfg = _parse_database_url(db_url)
+    elif os.environ.get("MYSQLHOST", "").strip():
+        # Railway MySQL 单变量模式
+        cfg = {
+            "host": os.environ.get("MYSQLHOST", "127.0.0.1"),
+            "port": int(os.environ.get("MYSQLPORT", "3306")),
+            "user": os.environ.get("MYSQLUSER", "root"),
+            "password": os.environ.get("MYSQLPASSWORD", ""),
+            "database": os.environ.get("MYSQLDATABASE", "herb_management_system"),
+        }
     else:
         cfg = {
             "host": os.environ.get("DB_HOST", "127.0.0.1"),
             "port": int(os.environ.get("DB_PORT", "3306")),
             "user": os.environ.get("DB_USER", "root"),
-            "password": os.environ.get("DB_PASSWORD", "Z8023502z!"),
+            # 本机 MySQL 密码请通过环境变量 DB_PASSWORD 设置，或自行修改此处
+            "password": os.environ.get("DB_PASSWORD", "YOUR_MYSQL_PASSWORD"),
             "database": os.environ.get("DB_NAME", "herb_management_system"),
         }
     cfg["charset"] = "utf8mb4"

@@ -21,6 +21,9 @@ from db import execute, query
 # ============ 路径配置 ============
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
 FRONTEND_DIR = os.path.join(BASE_DIR, "..", "frontend")
+if not os.path.isdir(FRONTEND_DIR):
+    # 云端部署（文件与后端平铺在同一目录）时直接使用当前目录
+    FRONTEND_DIR = BASE_DIR
 
 DEFAULT_WARNING_THRESHOLD = 200
 

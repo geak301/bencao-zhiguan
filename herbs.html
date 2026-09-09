@@ -1,0 +1,937 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>药材管理 - 本草智管平台</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <link href="https://cdn.jsdelivr.net/npm/font-awesome@4.7.0/css/font-awesome.min.css" rel="stylesheet">
+  <script>
+    tailwind.config = {
+      theme: {
+        extend: {
+          colors: {
+            primary: '#2E7D32',
+            secondary: '#8D6E63',
+            accent: '#D32F2F',
+            neutral: '#F5F5F5',
+          }
+        }
+      }
+    }
+  </script>
+  <style>
+    .sidebar-item-active {
+      background-color: rgba(46,125,50,0.1);
+      color: #2E7D32;
+      border-left: 4px solid #2E7D32;
+    }
+    .smart-suggest-box {
+      position: absolute; top: 100%; left: 0; right: 0;
+      background: white; border: 1px solid #e0e0e0; border-radius: 0 0 8px 8px;
+      max-height: 240px; overflow-y: auto; z-index: 100; box-shadow: 0 4px 12px rgba(0,0,0,0.1);
+    }
+    .smart-suggest-item { padding: 10px 14px; cursor: pointer; border-bottom: 1px solid #f5f5f5; transition: background 0.15s; }
+    .smart-suggest-item:hover { background: #e8f5e9; }
+    .smart-suggest-item .name { font-weight: 600; color: #2E7D32; font-size: 14px; }
+    .smart-suggest-item .meta { font-size: 12px; color: #888; margin-top: 2px; }
+    .matched-badge {
+      display: inline-block; padding: 2px 8px; background: #e8f5e9; color: #2E7D32;
+      border-radius: 10px; font-size: 11px; margin-left: 6px; animation: fadeIn 0.3s;
+    }
+    @keyframes fadeIn { from { opacity: 0; transform: translateY(-4px); } to { opacity: 1; transform: translateY(0); } }
+    .input-wrapper { position: relative; }
+    .warning-low { background: #fff3cd !important; }
+    .form-section {
+      border: 1px solid #e8e8e8; border-radius: 10px; padding: 16px; margin-bottom: 16px;
+      background: #fafafa;
+    }
+    .form-section-title {
+      font-size: 14px; font-weight: 600; color: #2E7D32; margin-bottom: 12px;
+      display: flex; align-items: center; gap: 6px;
+    }
+    .form-section-title i { font-size: 13px; }
+    .qty-adjust-btn {
+      padding: 4px 10px; border-radius: 6px; font-size: 12px; cursor: pointer;
+      border: 1px solid #ddd; background: white; transition: all 0.15s;
+    }
+    .qty-adjust-btn:hover { background: #f0f0f0; }
+    .qty-adjust-btn.plus { color: #2E7D32; border-color: #2E7D32; }
+    .qty-adjust-btn.plus:hover { background: #e8f5e9; }
+    .qty-adjust-btn.minus { color: #D32F2F; border-color: #D32F2F; }
+    .qty-adjust-btn.minus:hover { background: #ffebee; }
+  </style>
+</head>
+<body class="bg-neutral min-h-screen flex flex-col">
+  <header class="bg-primary text-white py-4 px-6 flex items-center justify-between shadow-lg">
+    <div class="flex items-center">
+      <button id="sidebar-toggle" class="mr-4 md:hidden"><i class="fa fa-bars text-xl"></i></button>
+      <i class="fa fa-leaf mr-2"></i>
+      <h1 class="text-xl font-bold">本草智管平台</h1>
+    </div>
+    <div class="flex items-center">
+      <span id="welcome-message" class="mr-4"></span>
+      <button id="logout-btn" class="text-white hover:text-white/80 transition-colors">
+        <i class="fa fa-sign-out mr-1"></i> 退出
+      </button>
+    </div>
+  </header>
+
+  <div class="flex flex-1 overflow-hidden">
+    <aside id="sidebar" class="w-64 bg-gray-50 border-r border-gray-200 transform -translate-x-full md:translate-x-0 fixed md:relative h-full transition-transform duration-300 ease-in-out z-30">
+      <div class="p-4">
+        <div class="flex items-center mb-6">
+          <div class="w-10 h-10 rounded-full bg-primary/20 flex items-center justify-center text-primary"><i class="fa fa-user"></i></div>
+          <div class="ml-3">
+            <p id="sidebar-username" class="font-medium text-gray-800"></p>
+            <p id="sidebar-role" class="text-xs text-gray-500">管理员</p>
+          </div>
+        </div>
+        <nav class="space-y-1" id="sidebar-nav">
+          <a href="dashboard.html" class="group flex items-center px-2 py-2 text-sm font-medium text-gray-700 rounded-md hover:bg-gray-100" data-role="admin,doctor,patient">
+            <i class="fa fa-dashboard w-6 text-center"></i><span class="ml-3">控制面板</span>
+          </a>
+          <a href="herbs.html" class="sidebar-item-active group flex items-center px-2 py-2 text-sm font-medium rounded-md" data-role="admin,doctor,patient">
+            <i class="fa fa-pagelines w-6 text-center"></i><span class="ml-3">药材管理</span>
+          </a>
+          <a href="logs.html" class="group flex items-center px-2 py-2 text-sm font-medium text-gray-700 rounded-md hover:bg-gray-100" data-role="admin">
+            <i class="fa fa-history w-6 text-center"></i><span class="ml-3">操作日志</span>
+          </a>
+          <a href="users.html" class="group flex items-center px-2 py-2 text-sm font-medium text-gray-700 rounded-md hover:bg-gray-100" data-role="admin">
+            <i class="fa fa-users w-6 text-center"></i><span class="ml-3">用户管理</span>
+          </a>
+        </nav>
+      </div>
+    </aside>
+
+    <main class="flex-1 overflow-auto p-6">
+      <div class="space-y-6">
+        <div class="flex justify-between items-center">
+          <div>
+            <h2 class="text-2xl font-bold text-gray-800">药材管理</h2>
+            <p class="text-sm text-gray-500 mt-1" id="smart-hint">管理员可添加、编辑药材及快速调整库存，所有操作自动记录日志</p>
+          </div>
+          <button id="add-herb-btn" class="bg-primary text-white px-4 py-2 rounded-lg font-medium hover:bg-green-700 transition-colors flex items-center">
+            <i class="fa fa-plus mr-2"></i> 添加药材
+          </button>
+        </div>
+
+        <div class="bg-white rounded-xl p-6 shadow-md">
+          <div class="flex flex-col md:flex-row md:items-center justify-between mb-6">
+            <div class="flex w-full md:w-auto">
+              <input type="text" id="search-input" class="w-full md:w-64 px-4 py-2 rounded-lg border border-gray-300 focus:outline-none focus:border-primary focus:ring-2 focus:ring-primary/20" placeholder="搜索药材名称/类别/产地">
+              <button id="search-btn" class="bg-primary text-white px-4 py-2 rounded-lg font-medium hover:bg-green-700 transition-colors ml-2"><i class="fa fa-search"></i></button>
+            </div>
+          </div>
+
+          <div id="herb-empty-state" class="flex flex-col items-center justify-center py-12 hidden">
+            <div class="w-16 h-16 bg-yellow-100 rounded-full flex items-center justify-center text-yellow-500 mb-4"><i class="fa fa-exclamation-triangle text-2xl"></i></div>
+            <h3 class="text-lg font-medium text-gray-900 mb-2">暂无药材数据</h3>
+            <p class="text-gray-500 mb-6">点击"添加药材"按钮开始管理，支持智能匹配药材信息</p>
+          </div>
+
+          <div id="herb-table-container" class="overflow-x-auto hidden">
+            <table class="min-w-full divide-y divide-gray-200">
+              <thead class="bg-gray-50">
+                <tr>
+                  <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">编码</th>
+                  <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">药材名称</th>
+                  <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">类别</th>
+                  <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">产地</th>
+                  <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">当前库存</th>
+                  <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">预警阈值</th>
+                  <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">单价</th>
+                  <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">状态</th>
+                  <th class="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">操作</th>
+                </tr>
+              </thead>
+              <tbody id="herb-table-body" class="bg-white divide-y divide-gray-200"></tbody>
+            </table>
+          </div>
+        </div>
+      </div>
+    </main>
+  </div>
+
+  <!-- 添加/编辑药材模态框 -->
+  <div id="add-herb-modal" class="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 hidden">
+    <div class="bg-white rounded-xl p-6 w-full max-w-2xl mx-4 max-h-[90vh] overflow-y-auto">
+      <div class="flex justify-between items-center mb-4">
+        <h3 class="text-xl font-bold text-gray-800" id="modal-title">添加药材</h3>
+        <button id="close-modal-btn" class="text-gray-400 hover:text-gray-600"><i class="fa fa-times text-xl"></i></button>
+      </div>
+      <form id="add-herb-form" class="space-y-0">
+        <!-- 第一组：基本信息 -->
+        <div class="form-section">
+          <div class="form-section-title"><i class="fa fa-info-circle"></i> 基本信息</div>
+          <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <div class="input-wrapper">
+              <label class="block text-sm font-medium text-gray-700 mb-1">
+                药材名称 <span class="text-red-500">*</span>
+                <span id="smart-match-badge" class="matched-badge hidden"><i class="fa fa-magic"></i> 已智能匹配</span>
+              </label>
+              <input type="text" id="herb-name" autocomplete="off" class="w-full px-4 py-2 rounded-lg border border-gray-300 focus:outline-none focus:border-primary focus:ring-2 focus:ring-primary/20" placeholder="输入名称，自动匹配产地等信息">
+              <div id="smart-suggest-box" class="smart-suggest-box hidden"></div>
+            </div>
+            <div>
+              <label class="block text-sm font-medium text-gray-700 mb-1">药材编码 <span class="text-red-500">*</span></label>
+              <input type="text" id="herb-code" class="w-full px-4 py-2 rounded-lg border border-gray-300 bg-gray-50" readonly>
+            </div>
+            <div>
+              <label class="block text-sm font-medium text-gray-700 mb-1">药材类别 <span class="text-red-500">*</span></label>
+              <select id="herb-category" class="w-full px-4 py-2 rounded-lg border border-gray-300 focus:outline-none focus:border-primary focus:ring-2 focus:ring-primary/20">
+                <option value="">请选择类别</option>
+                <option value="根茎类">根茎类</option><option value="叶类">叶类</option><option value="花类">花类</option>
+                <option value="果实种子类">果实种子类</option><option value="全草类">全草类</option><option value="皮类">皮类</option>
+                <option value="藤木类">藤木类</option><option value="菌藻类">菌藻类</option><option value="动物类">动物类</option>
+                <option value="矿物类">矿物类</option><option value="其他">其他</option>
+              </select>
+            </div>
+            <div>
+              <label class="block text-sm font-medium text-gray-700 mb-1">产地 <span class="text-red-500">*</span></label>
+              <input type="text" id="herb-origin" class="w-full px-4 py-2 rounded-lg border border-gray-300 focus:outline-none focus:border-primary focus:ring-2 focus:ring-primary/20" placeholder="智能匹配后自动填充">
+            </div>
+            <div class="md:col-span-2">
+              <label class="block text-sm font-medium text-gray-700 mb-1">储存条件</label>
+              <input type="text" id="herb-storage" class="w-full px-4 py-2 rounded-lg border border-gray-300 focus:outline-none focus:border-primary focus:ring-2 focus:ring-primary/20" placeholder="如：置阴凉干燥处，防潮防蛀">
+            </div>
+          </div>
+        </div>
+
+        <!-- 第二组：库存与价格 -->
+        <div class="form-section">
+          <div class="form-section-title"><i class="fa fa-cubes"></i> 库存与价格</div>
+          <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <div>
+              <label class="block text-sm font-medium text-gray-700 mb-1">计量单位 <span class="text-red-500">*</span></label>
+              <input type="text" id="herb-unit" class="w-full px-4 py-2 rounded-lg border border-gray-300 focus:outline-none focus:border-primary focus:ring-2 focus:ring-primary/20" placeholder="如：g、kg、盒">
+            </div>
+            <div>
+              <label class="block text-sm font-medium text-gray-700 mb-1">单价（元）<span class="text-red-500">*</span></label>
+              <input type="number" id="herb-price" class="w-full px-4 py-2 rounded-lg border border-gray-300 focus:outline-none focus:border-primary focus:ring-2 focus:ring-primary/20" placeholder="请输入单价" min="0" step="0.01">
+            </div>
+            <div>
+              <label class="block text-sm font-medium text-gray-700 mb-1">
+                <span id="qty-field-label">初始库存</span> <span class="text-red-500">*</span>
+              </label>
+              <input type="number" id="herb-quantity" class="w-full px-4 py-2 rounded-lg border border-gray-300 focus:outline-none focus:border-primary focus:ring-2 focus:ring-primary/20" placeholder="请输入库存数量" min="0">
+            </div>
+            <div>
+              <label class="block text-sm font-medium text-gray-700 mb-1">
+                库存预警阈值 <span class="text-red-500">*</span>
+                <span class="text-xs text-gray-400 ml-1">低于此值预警</span>
+              </label>
+              <input type="number" id="herb-warning-threshold" class="w-full px-4 py-2 rounded-lg border border-gray-300 focus:outline-none focus:border-primary focus:ring-2 focus:ring-primary/20" placeholder="智能匹配后自动设置" min="0">
+            </div>
+          </div>
+        </div>
+
+        <!-- 第三组：补充信息 -->
+        <div class="form-section">
+          <div class="form-section-title"><i class="fa fa-file-text-o"></i> 补充信息</div>
+          <div>
+            <label class="block text-sm font-medium text-gray-700 mb-1">药材描述（功效、性味等）</label>
+            <textarea id="herb-description" rows="3" class="w-full px-4 py-2 rounded-lg border border-gray-300 focus:outline-none focus:border-primary focus:ring-2 focus:ring-primary/20" placeholder="智能匹配后自动填充功效等信息"></textarea>
+          </div>
+        </div>
+
+        <div class="flex justify-end space-x-4 pt-2">
+          <button type="button" id="cancel-add-herb" class="px-6 py-2 border border-gray-300 rounded-lg font-medium hover:bg-gray-50 transition-colors">取消</button>
+          <button type="submit" class="px-6 py-2 bg-primary text-white rounded-lg font-medium hover:bg-green-700 transition-colors"><i class="fa fa-save mr-1"></i> 保存</button>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <!-- 快速调库模态框 -->
+  <div id="quick-adjust-modal" class="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 hidden">
+    <div class="bg-white rounded-xl p-6 w-full max-w-md mx-4">
+      <div class="flex justify-between items-center mb-4">
+        <h3 class="text-xl font-bold text-gray-800">快速调整库存</h3>
+        <button id="close-adjust-modal" class="text-gray-400 hover:text-gray-600"><i class="fa fa-times text-xl"></i></button>
+      </div>
+      <div class="mb-4 p-4 bg-gray-50 rounded-lg">
+        <div class="flex justify-between items-center mb-2">
+          <span class="font-medium text-gray-800" id="adjust-herb-name">药材名称</span>
+          <span class="text-sm text-gray-500" id="adjust-herb-code">编码</span>
+        </div>
+        <div class="flex justify-between items-center">
+          <span class="text-sm text-gray-500">当前库存：</span>
+          <span class="text-lg font-bold text-primary" id="adjust-current-qty">0</span>
+        </div>
+      </div>
+      <div class="mb-4">
+        <label class="block text-sm font-medium text-gray-700 mb-2">调整数量（正数为入库，负数为出库）</label>
+        <div class="flex items-center gap-2">
+          <button type="button" class="qty-adjust-btn minus" onclick="adjustInput(-10)"><i class="fa fa-minus"></i> 10</button>
+          <button type="button" class="qty-adjust-btn minus" onclick="adjustInput(-1)"><i class="fa fa-minus"></i> 1</button>
+          <input type="number" id="adjust-amount" class="flex-1 px-4 py-2 rounded-lg border border-gray-300 focus:outline-none focus:border-primary focus:ring-2 focus:ring-primary/20 text-center text-lg" value="0" placeholder="输入调整数量">
+          <button type="button" class="qty-adjust-btn plus" onclick="adjustInput(1)"><i class="fa fa-plus"></i> 1</button>
+          <button type="button" class="qty-adjust-btn plus" onclick="adjustInput(10)"><i class="fa fa-plus"></i> 10</button>
+        </div>
+      </div>
+      <div class="mb-4 p-3 rounded-lg" id="adjust-preview-box">
+        <div class="flex justify-between items-center">
+          <span class="text-sm text-gray-600">调整后库存：</span>
+          <span class="text-lg font-bold" id="adjust-preview-qty">0</span>
+        </div>
+      </div>
+      <div class="flex justify-center space-x-4">
+        <button type="button" id="cancel-adjust" class="px-6 py-2 border border-gray-300 rounded-lg font-medium hover:bg-gray-50 transition-colors">取消</button>
+        <button type="button" id="confirm-adjust" class="px-6 py-2 bg-primary text-white rounded-lg font-medium hover:bg-green-700 transition-colors"><i class="fa fa-check mr-1"></i> 确认调整</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- 删除确认模态框 -->
+  <div id="delete-herb-modal" class="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 hidden">
+    <div class="bg-white rounded-xl p-6 w-full max-w-md mx-4">
+      <div class="text-center mb-4">
+        <div class="w-16 h-16 bg-red-100 rounded-full flex items-center justify-center text-red-500 mb-4 mx-auto"><i class="fa fa-exclamation-triangle text-2xl"></i></div>
+        <h3 class="text-xl font-bold text-gray-800 mb-2">确认删除</h3>
+        <p class="text-gray-600" id="delete-herb-message">您确定要删除此药材吗？删除操作将记录到日志中，此操作不可撤销。</p>
+      </div>
+      <div class="flex justify-center space-x-4">
+        <button id="cancel-delete-herb" class="px-6 py-2 border border-gray-300 rounded-lg font-medium hover:bg-gray-50 transition-colors">取消</button>
+        <button id="confirm-delete-herb" class="px-6 py-2 bg-red-600 text-white rounded-lg font-medium hover:bg-red-700 transition-colors"><i class="fa fa-trash mr-1"></i> 删除</button>
+      </div>
+    </div>
+  </div>
+
+  <script>
+    // ===== 后端 API 辅助层 =====
+    const API_BASE = '';
+    async function api(method, url, body) {
+      const opts = { method: method, headers: { 'Content-Type': 'application/json', 'X-User': sessionStorage.getItem('current_user') || '' } };
+      if (body !== undefined) opts.body = JSON.stringify(body);
+      const resp = await fetch(API_BASE + url, opts);
+      const result = await resp.json().catch(() => ({ code: -1, message: '服务器连接失败' }));
+      if (result.code !== 0) {
+        alert(result.message);
+        throw new Error(result.message);
+      }
+      return result.data;
+    }
+
+    const PRECIOUS_HERBS = ['人参','西洋参','鹿茸','麝香','牛黄','羚羊角','冬虫夏草','川贝母','沉香','血竭','阿胶','龟甲','鳖甲','蛤蚧','海马','紫河车','苏合香','安息香','冰片','檀香','三七','天麻','石斛','灵芝','乳香','没药','黄连'];
+    const DEFAULT_WARNING_THRESHOLD = 200;
+    const PRECIOUS_WARNING_THRESHOLD = 50;
+    const LOGS_KEY = 'herb_operation_logs';
+    const LOG_RETENTION_DAYS = 365;
+    const FIELD_LABELS = {
+      name: '药材名称', category: '类别', origin: '产地', storage: '储存条件',
+      unit: '单位', price: '单价', quantity: '库存数量', description: '描述', warningThreshold: '预警阈值'
+    };
+
+    const HERB_DATABASE = [
+      { name: '人参', category: '根茎类', origin: '吉林长白山', storage: '密闭，置阴凉干燥处，防蛀', unit: 'g', description: '大补元气，复脉固脱，补脾益肺，生津养血，安神益智。' },
+      { name: '黄芪', category: '根茎类', origin: '内蒙古、山西', storage: '置通风干燥处，防潮，防蛀', unit: 'g', description: '补气升阳，固表止汗，利水消肿，生津养血，行滞通痹。' },
+      { name: '当归', category: '根茎类', origin: '甘肃岷县', storage: '置阴凉干燥处，防潮，防蛀', unit: 'g', description: '补血活血，调经止痛，润肠通便。' },
+      { name: '川芎', category: '根茎类', origin: '四川都江堰', storage: '置阴凉干燥处，防蛀', unit: 'g', description: '活血行气，祛风止痛。' },
+      { name: '白芍', category: '根茎类', origin: '安徽亳州', storage: '置干燥处，防蛀', unit: 'g', description: '养血调经，敛阴止汗，柔肝止痛，平抑肝阳。' },
+      { name: '熟地黄', category: '根茎类', origin: '河南焦作', storage: '置通风干燥处', unit: 'g', description: '补血滋阴，益精填髓。' },
+      { name: '生地黄', category: '根茎类', origin: '河南焦作', storage: '置通风干燥处', unit: 'g', description: '清热凉血，养阴生津。' },
+      { name: '白术', category: '根茎类', origin: '浙江磐安', storage: '置阴凉干燥处，防蛀', unit: 'g', description: '健脾益气，燥湿利水，止汗，安胎。' },
+      { name: '茯苓', category: '菌藻类', origin: '云南、安徽', storage: '置干燥处，防潮', unit: 'g', description: '利水渗湿，健脾，宁心。' },
+      { name: '甘草', category: '根茎类', origin: '内蒙古、新疆', storage: '置通风干燥处，防蛀', unit: 'g', description: '补脾益气，清热解毒，祛痰止咳，缓急止痛，调和诸药。' },
+      { name: '枸杞子', category: '果实种子类', origin: '宁夏中宁', storage: '置阴凉干燥处，防闷热，防潮，防蛀', unit: 'g', description: '滋补肝肾，益精明目。' },
+      { name: '菊花', category: '花类', origin: '浙江桐乡、安徽亳州', storage: '置阴凉干燥处，密闭保存，防霉防蛀', unit: 'g', description: '散风清热，平肝明目，清热解毒。' },
+      { name: '金银花', category: '花类', origin: '山东平邑、河南封丘', storage: '置阴凉干燥处，防潮，防蛀', unit: 'g', description: '清热解毒，疏散风热。' },
+      { name: '连翘', category: '果实种子类', origin: '山西、陕西', storage: '置干燥处', unit: 'g', description: '清热解毒，消肿散结，疏散风热。' },
+      { name: '板蓝根', category: '根茎类', origin: '河北、江苏', storage: '置干燥处，防霉，防蛀', unit: 'g', description: '清热解毒，凉血利咽。' },
+      { name: '柴胡', category: '根茎类', origin: '河北、山西', storage: '置通风干燥处，防蛀', unit: 'g', description: '疏散退热，疏肝解郁，升举阳气。' },
+      { name: '黄芩', category: '根茎类', origin: '河北、山西', storage: '置通风干燥处，防潮', unit: 'g', description: '清热燥湿，泻火解毒，止血，安胎。' },
+      { name: '黄连', category: '根茎类', origin: '四川石柱', storage: '置通风干燥处', unit: 'g', description: '清热燥湿，泻火解毒。' },
+      { name: '黄柏', category: '皮类', origin: '四川、贵州', storage: '置通风干燥处，防潮', unit: 'g', description: '清热燥湿，泻火除蒸，解毒疗疮。' },
+      { name: '大黄', category: '根茎类', origin: '青海、甘肃', storage: '置通风干燥处，防蛀', unit: 'g', description: '泻下攻积，清热泻火，凉血解毒，逐瘀通经。' },
+      { name: '山药', category: '根茎类', origin: '河南焦作', storage: '置通风干燥处，防蛀', unit: 'g', description: '补脾养胃，生津益肺，补肾涩精。' },
+      { name: '山茱萸', category: '果实种子类', origin: '河南西峡、浙江', storage: '置干燥处，防蛀', unit: 'g', description: '补益肝肾，收涩固脱。' },
+      { name: '牡丹皮', category: '皮类', origin: '安徽铜陵', storage: '置阴凉干燥处', unit: 'g', description: '清热凉血，活血化瘀。' },
+      { name: '泽泻', category: '根茎类', origin: '福建建瓯', storage: '置干燥处，防蛀', unit: 'g', description: '利水渗湿，泄热，化浊降脂。' },
+      { name: '桂枝', category: '藤木类', origin: '广西、广东', storage: '置阴凉干燥处', unit: 'g', description: '发汗解肌，温通经脉，助阳化气，平冲降逆。' },
+      { name: '附子', category: '根茎类', origin: '四川江油', storage: '置阴凉干燥处', unit: 'g', description: '回阳救逆，补火助阳，散寒止痛。' },
+      { name: '干姜', category: '根茎类', origin: '四川、贵州', storage: '置阴凉干燥处，防蛀', unit: 'g', description: '温中散寒，回阳通脉，温肺化饮。' },
+      { name: '肉桂', category: '皮类', origin: '广西', storage: '置阴凉干燥处，密闭保存', unit: 'g', description: '补火助阳，引火归元，散寒止痛，温通经脉。' },
+      { name: '陈皮', category: '果实种子类', origin: '广东新会', storage: '置阴凉干燥处，防霉，防蛀', unit: 'g', description: '理气健脾，燥湿化痰。' },
+      { name: '半夏', category: '根茎类', origin: '四川、湖北', storage: '置通风干燥处，防蛀', unit: 'g', description: '燥湿化痰，降逆止呕，消痞散结。' },
+      { name: '丹参', category: '根茎类', origin: '山东、河南', storage: '置干燥处', unit: 'g', description: '活血祛瘀，通经止痛，清心除烦，凉血消痈。' },
+      { name: '红花', category: '花类', origin: '新疆、河南', storage: '置阴凉干燥处，防潮，防蛀', unit: 'g', description: '活血通经，散瘀止痛。' },
+      { name: '桃仁', category: '果实种子类', origin: '河北、山东', storage: '置阴凉干燥处，防蛀', unit: 'g', description: '活血祛瘀，润肠通便，止咳平喘。' },
+      { name: '益母草', category: '全草类', origin: '全国大部分地区', storage: '置干燥处', unit: 'g', description: '活血调经，利尿消肿，清热解毒。' },
+      { name: '牛膝', category: '根茎类', origin: '河南焦作', storage: '置阴凉干燥处，防潮', unit: 'g', description: '逐瘀通经，补肝肾，强筋骨，利尿通淋，引血下行。' },
+      { name: '杜仲', category: '皮类', origin: '贵州、四川', storage: '置通风干燥处', unit: 'g', description: '补肝肾，强筋骨，安胎。' },
+      { name: '续断', category: '根茎类', origin: '湖北、四川', storage: '置干燥处，防蛀', unit: 'g', description: '补肝肾，强筋骨，续折伤，止崩漏。' },
+      { name: '淫羊藿', category: '全草类', origin: '陕西、甘肃', storage: '置干燥处', unit: 'g', description: '补肾阳，强筋骨，祛风湿。' },
+      { name: '巴戟天', category: '根茎类', origin: '广东高要', storage: '置通风干燥处，防霉，防蛀', unit: 'g', description: '补肾阳，强筋骨，祛风湿。' },
+      { name: '肉苁蓉', category: '根茎类', origin: '内蒙古、新疆', storage: '置通风干燥处，防蛀', unit: 'g', description: '补肾阳，益精血，润肠通便。' },
+      { name: '菟丝子', category: '果实种子类', origin: '内蒙古、宁夏', storage: '置通风干燥处', unit: 'g', description: '补益肝肾，固精缩尿，安胎，明目，止泻。' },
+      { name: '决明子', category: '果实种子类', origin: '安徽、广西', storage: '置干燥处', unit: 'g', description: '清热明目，润肠通便。' },
+      { name: '薄荷', category: '全草类', origin: '江苏、安徽', storage: '置阴凉干燥处', unit: 'g', description: '疏散风热，清利头目，利咽，透疹，疏肝行气。' },
+      { name: '牛蒡子', category: '果实种子类', origin: '吉林、辽宁', storage: '置通风干燥处', unit: 'g', description: '疏散风热，宣肺透疹，解毒利咽。' },
+      { name: '桑叶', category: '叶类', origin: '全国大部分地区', storage: '置干燥处', unit: 'g', description: '疏散风热，清肺润燥，清肝明目。' },
+      { name: '葛根', category: '根茎类', origin: '湖南、河南', storage: '置通风干燥处，防蛀', unit: 'g', description: '解肌退热，生津止渴，透疹，升阳止泻，通经活络。' },
+      { name: '升麻', category: '根茎类', origin: '黑龙江、辽宁', storage: '置通风干燥处', unit: 'g', description: '发表透疹，清热解毒，升举阳气。' },
+      { name: '石膏', category: '矿物类', origin: '湖北、山东', storage: '置干燥处', unit: 'g', description: '清热泻火，除烦止渴。' },
+      { name: '知母', category: '根茎类', origin: '河北、山西', storage: '置通风干燥处，防潮', unit: 'g', description: '清热泻火，滋阴润燥。' },
+      { name: '栀子', category: '果实种子类', origin: '江西、湖南', storage: '置通风干燥处', unit: 'g', description: '泻火除烦，清热利湿，凉血解毒；外用消肿止痛。' },
+      { name: '夏枯草', category: '全草类', origin: '江苏、安徽', storage: '置干燥处', unit: 'g', description: '清肝泻火，明目，散结消肿。' },
+      { name: '苦参', category: '根茎类', origin: '山西、河南', storage: '置干燥处', unit: 'g', description: '清热燥湿，杀虫，利尿。' },
+      { name: '蒲公英', category: '全草类', origin: '全国大部分地区', storage: '置通风干燥处，防潮，防蛀', unit: 'g', description: '清热解毒，消肿散结，利湿通淋。' },
+      { name: '鱼腥草', category: '全草类', origin: '四川、贵州', storage: '置干燥处', unit: 'g', description: '清热解毒，消痈排脓，利尿通淋。' },
+      { name: '白头翁', category: '根茎类', origin: '河北、辽宁', storage: '置通风干燥处', unit: 'g', description: '清热解毒，凉血止痢。' },
+      { name: '青蒿', category: '全草类', origin: '全国大部分地区', storage: '置阴凉干燥处', unit: 'g', description: '清虚热，除骨蒸，解暑热，截疟，退黄。' },
+      { name: '地骨皮', category: '皮类', origin: '全国大部分地区', storage: '置干燥处', unit: 'g', description: '凉血除蒸，清肺降火。' },
+      { name: '芒硝', category: '矿物类', origin: '河北、河南', storage: '密闭，置阴凉干燥处，防风化', unit: 'g', description: '泻下通便，润燥软坚，清火消肿。' },
+      { name: '火麻仁', category: '果实种子类', origin: '山东、河北', storage: '置阴凉干燥处，防热，防蛀', unit: 'g', description: '润肠通便。' },
+      { name: '独活', category: '根茎类', origin: '湖北、四川', storage: '置干燥处，防霉，防蛀', unit: 'g', description: '祛风除湿，通痹止痛。' },
+      { name: '威灵仙', category: '根茎类', origin: '江苏、安徽', storage: '置干燥处', unit: 'g', description: '祛风湿，通经络，止痛，消骨骾。' },
+      { name: '木瓜', category: '果实种子类', origin: '安徽宣城', storage: '置阴凉干燥处，防潮，防蛀', unit: 'g', description: '舒筋活络，和胃化湿。' },
+      { name: '防己', category: '根茎类', origin: '浙江、安徽', storage: '置干燥处，防霉，防蛀', unit: 'g', description: '祛风湿，止痛，利水消肿。' },
+      { name: '秦艽', category: '根茎类', origin: '甘肃、陕西', storage: '置干燥处', unit: 'g', description: '祛风湿，清湿热，舒筋络，止痹痛，退虚热。' },
+      { name: '豨莶草', category: '全草类', origin: '湖南、湖北', storage: '置干燥处', unit: 'g', description: '祛风湿，利关节，解毒。' },
+      { name: '络石藤', category: '藤木类', origin: '江苏、湖北', storage: '置干燥处', unit: 'g', description: '祛风通络，凉血消肿。' },
+      { name: '桑寄生', category: '全草类', origin: '广东、广西', storage: '置干燥处，防蛀', unit: 'g', description: '祛风湿，补肝肾，强筋骨，安胎元。' },
+      { name: '五加皮', category: '皮类', origin: '湖北、河南', storage: '置干燥处，防霉，防蛀', unit: 'g', description: '祛风除湿，补益肝肾，强筋壮骨，利水消肿。' },
+      { name: '藿香', category: '全草类', origin: '广东、四川', storage: '置阴凉干燥处，防潮', unit: 'g', description: '芳香化浊，和中止呕，发表解暑。' },
+      { name: '佩兰', category: '全草类', origin: '江苏、河北', storage: '置阴凉干燥处，防潮', unit: 'g', description: '芳香化湿，醒脾开胃，发表解暑。' },
+      { name: '苍术', category: '根茎类', origin: '江苏、湖北', storage: '置阴凉干燥处', unit: 'g', description: '燥湿健脾，祛风散寒，明目。' },
+      { name: '厚朴', category: '皮类', origin: '四川、湖北', storage: '置通风干燥处', unit: 'g', description: '燥湿消痰，下气除满。' },
+      { name: '砂仁', category: '果实种子类', origin: '广东阳春', storage: '置阴凉干燥处', unit: 'g', description: '化湿开胃，温脾止泻，理气安胎。' },
+      { name: '白豆蔻', category: '果实种子类', origin: '泰国、越南（进口）', storage: '密闭，置阴凉干燥处，防蛀', unit: 'g', description: '化湿行气，温中止呕，开胃消食。' },
+      { name: '薏苡仁', category: '果实种子类', origin: '福建、河北', storage: '置通风干燥处，防蛀', unit: 'g', description: '利水渗湿，健脾止泻，除痹，排脓，解毒散结。' },
+      { name: '猪苓', category: '菌藻类', origin: '陕西、云南', storage: '置干燥处', unit: 'g', description: '利水渗湿。' },
+      { name: '车前子', category: '果实种子类', origin: '江西、河南', storage: '置通风干燥处，防潮', unit: 'g', description: '清热利尿通淋，渗湿止泻，明目，祛痰。' },
+      { name: '滑石', category: '矿物类', origin: '山东、江西', storage: '置干燥处', unit: 'g', description: '利尿通淋，清热解暑；外用祛湿敛疮。' },
+      { name: '木通', category: '藤木类', origin: '四川、湖北', storage: '置干燥处', unit: 'g', description: '利尿通淋，清心除烦，通经下乳。' },
+      { name: '茵陈', category: '全草类', origin: '陕西、山西', storage: '置阴凉干燥处，防潮', unit: 'g', description: '清利湿热，利胆退黄。' },
+      { name: '金钱草', category: '全草类', origin: '四川、广东', storage: '置干燥处', unit: 'g', description: '利湿退黄，利尿通淋，解毒消肿。' },
+      { name: '虎杖', category: '根茎类', origin: '江苏、浙江', storage: '置干燥处，防霉，防蛀', unit: 'g', description: '利湿退黄，清热解毒，散瘀止痛，化痰止咳。' },
+      { name: '小茴香', category: '果实种子类', origin: '内蒙古、山西', storage: '置阴凉干燥处', unit: 'g', description: '散寒止痛，理气和胃。' },
+      { name: '丁香', category: '花类', origin: '坦桑尼亚、马来西亚（进口）', storage: '置阴凉干燥处', unit: 'g', description: '温中降逆，补肾助阳。' },
+      { name: '高良姜', category: '根茎类', origin: '广东、海南', storage: '置阴凉干燥处', unit: 'g', description: '温胃止呕，散寒止痛。' },
+      { name: '花椒', category: '果实种子类', origin: '四川、陕西', storage: '置通风干燥处', unit: 'g', description: '温中止痛，杀虫止痒。' },
+      { name: '青皮', category: '果实种子类', origin: '广东、福建', storage: '置阴凉干燥处', unit: 'g', description: '疏肝破气，消积化滞。' },
+      { name: '枳实', category: '果实种子类', origin: '四川、江西', storage: '置阴凉干燥处，防蛀', unit: 'g', description: '破气消积，化痰散痞。' },
+      { name: '木香', category: '根茎类', origin: '云南、四川', storage: '置干燥处，防潮', unit: 'g', description: '行气止痛，健脾消食。' },
+      { name: '沉香', category: '藤木类', origin: '广东、海南', storage: '密闭，置阴凉干燥处', unit: 'g', description: '行气止痛，温中止呕，纳气平喘。' },
+      { name: '香附', category: '根茎类', origin: '山东、浙江', storage: '置阴凉干燥处，防蛀', unit: 'g', description: '疏肝解郁，理气宽中，调经止痛。' },
+      { name: '佛手', category: '果实种子类', origin: '广东、四川', storage: '置阴凉干燥处，防霉，防蛀', unit: 'g', description: '疏肝理气，和胃止痛，燥湿化痰。' },
+      { name: '薤白', category: '根茎类', origin: '江苏、浙江', storage: '置干燥处，防蛀', unit: 'g', description: '通阳散结，行气导滞。' },
+      { name: '山楂', category: '果实种子类', origin: '山东、河南', storage: '置通风干燥处，防蛀', unit: 'g', description: '消食健胃，行气散瘀，化浊降脂。' },
+      { name: '神曲', category: '其他', origin: '全国大部分地区', storage: '置干燥处，防蛀', unit: 'g', description: '消食和胃。' },
+      { name: '麦芽', category: '果实种子类', origin: '全国大部分地区', storage: '置通风干燥处，防蛀', unit: 'g', description: '行气消食，健脾开胃，回乳消胀。' },
+      { name: '莱菔子', category: '果实种子类', origin: '河北、河南', storage: '置通风干燥处，防蛀', unit: 'g', description: '消食除胀，降气化痰。' },
+      { name: '鸡内金', category: '动物类', origin: '全国大部分地区', storage: '置干燥处，防蛀', unit: 'g', description: '健胃消食，涩精止遗，通淋化石。' },
+      { name: '使君子', category: '果实种子类', origin: '四川、福建', storage: '置通风干燥处，防霉，防蛀', unit: 'g', description: '杀虫消积。' },
+      { name: '苦楝皮', category: '皮类', origin: '四川、湖北', storage: '置干燥处，防潮', unit: 'g', description: '杀虫，疗癣。' },
+      { name: '槟榔', category: '果实种子类', origin: '海南、云南', storage: '置通风干燥处，防蛀', unit: 'g', description: '杀虫，消积，行气，利水，截疟。' },
+      { name: '小蓟', category: '全草类', origin: '全国大部分地区', storage: '置通风干燥处', unit: 'g', description: '凉血止血，散瘀解毒消痈。' },
+      { name: '大蓟', category: '全草类', origin: '全国大部分地区', storage: '置通风干燥处', unit: 'g', description: '凉血止血，散瘀解毒消痈。' },
+      { name: '地榆', category: '根茎类', origin: '黑龙江、吉林', storage: '置通风干燥处，防蛀', unit: 'g', description: '凉血止血，解毒敛疮。' },
+      { name: '槐花', category: '花类', origin: '辽宁、江苏', storage: '置干燥处，防潮，防蛀', unit: 'g', description: '凉血止血，清肝泻火。' },
+      { name: '侧柏叶', category: '叶类', origin: '全国大部分地区', storage: '置干燥处', unit: 'g', description: '凉血止血，化痰止咳，生发乌发。' },
+      { name: '白茅根', category: '根茎类', origin: '全国大部分地区', storage: '置干燥处', unit: 'g', description: '凉血止血，清热利尿。' },
+      { name: '三七', category: '根茎类', origin: '云南文山', storage: '置阴凉干燥处，防蛀', unit: 'g', description: '散瘀止血，消肿定痛。' },
+      { name: '茜草', category: '根茎类', origin: '陕西、河南', storage: '置干燥处', unit: 'g', description: '凉血，祛瘀，止血，通经。' },
+      { name: '蒲黄', category: '花类', origin: '江苏、浙江', storage: '置通风干燥处，防潮，防蛀', unit: 'g', description: '止血，化瘀，通淋。' },
+      { name: '白及', category: '根茎类', origin: '贵州、四川', storage: '置干燥处', unit: 'g', description: '收敛止血，消肿生肌。' },
+      { name: '仙鹤草', category: '全草类', origin: '全国大部分地区', storage: '置通风干燥处', unit: 'g', description: '收敛止血，截疟，止痢，解毒，补虚。' },
+      { name: '艾叶', category: '叶类', origin: '湖北、安徽', storage: '置阴凉干燥处', unit: 'g', description: '温经止血，散寒止痛；外用祛湿止痒。' },
+      { name: '延胡索', category: '根茎类', origin: '浙江、江苏', storage: '置干燥处，防蛀', unit: 'g', description: '活血，行气，止痛。' },
+      { name: '郁金', category: '根茎类', origin: '四川、广西', storage: '置干燥处，防蛀', unit: 'g', description: '活血止痛，行气解郁，清心凉血，利胆退黄。' },
+      { name: '姜黄', category: '根茎类', origin: '四川、福建', storage: '置阴凉干燥处', unit: 'g', description: '破血行气，通经止痛。' },
+      { name: '乳香', category: '其他', origin: '索马里、埃塞俄比亚（进口）', storage: '置阴凉干燥处', unit: 'g', description: '活血定痛，消肿生肌。' },
+      { name: '没药', category: '其他', origin: '索马里、埃塞俄比亚（进口）', storage: '置阴凉干燥处', unit: 'g', description: '散瘀定痛，消肿生肌。' },
+      { name: '鸡血藤', category: '藤木类', origin: '广西、云南', storage: '置通风干燥处，防霉，防蛀', unit: 'g', description: '活血补血，调经止痛，舒筋活络。' },
+      { name: '王不留行', category: '果实种子类', origin: '河北、山东', storage: '置干燥处', unit: 'g', description: '活血通经，下乳消肿，利尿通淋。' },
+      { name: '土鳖虫', category: '动物类', origin: '江苏、河南', storage: '置通风干燥处，防蛀', unit: 'g', description: '破血逐瘀，续筋接骨。' },
+      { name: '骨碎补', category: '根茎类', origin: '湖北、浙江', storage: '置干燥处', unit: 'g', description: '疗伤止痛，补肾强骨；外用消风祛斑。' },
+      { name: '莪术', category: '根茎类', origin: '广西、四川', storage: '置干燥处，防蛀', unit: 'g', description: '破血行气，消积止痛。' },
+      { name: '三棱', category: '根茎类', origin: '江苏、河南', storage: '置通风干燥处，防蛀', unit: 'g', description: '破血行气，消积止痛。' },
+      { name: '水蛭', category: '动物类', origin: '山东、江苏', storage: '置干燥处，防蛀', unit: 'g', description: '破血通经，逐瘀消癥。' },
+      { name: '白附子', category: '根茎类', origin: '河南、甘肃', storage: '置干燥处，防蛀', unit: 'g', description: '燥湿化痰，祛风止痉，止痛，解毒散结。' },
+      { name: '芥子', category: '果实种子类', origin: '安徽、河南', storage: '置通风干燥处，防潮', unit: 'g', description: '温肺豁痰利气，散结通络止痛。' },
+      { name: '旋覆花', category: '花类', origin: '河南、江苏', storage: '置干燥处，防潮', unit: 'g', description: '降气，消痰，行水，止呕。' },
+      { name: '白前', category: '根茎类', origin: '浙江、江苏', storage: '置通风干燥处', unit: 'g', description: '降气，消痰，止咳。' },
+      { name: '桔梗', category: '根茎类', origin: '安徽、江苏', storage: '置通风干燥处，防蛀', unit: 'g', description: '宣肺，利咽，祛痰，排脓。' },
+      { name: '川贝母', category: '根茎类', origin: '四川、青海', storage: '置通风干燥处，防蛀', unit: 'g', description: '清热润肺，化痰止咳，散结消痈。' },
+      { name: '浙贝母', category: '根茎类', origin: '浙江宁波', storage: '置干燥处，防蛀', unit: 'g', description: '清热化痰止咳，解毒散结消痈。' },
+      { name: '瓜蒌', category: '果实种子类', origin: '山东、河北', storage: '置阴凉干燥处，防霉，防蛀', unit: 'g', description: '清热涤痰，宽胸散结，润燥滑肠。' },
+      { name: '竹茹', category: '其他', origin: '长江流域各省', storage: '置干燥处，防霉，防蛀', unit: 'g', description: '清热化痰，除烦，止呕。' },
+      { name: '前胡', category: '根茎类', origin: '浙江、湖南', storage: '置阴凉干燥处，防霉，防蛀', unit: 'g', description: '降气化痰，散风清热。' },
+      { name: '海藻', category: '菌藻类', origin: '辽宁、山东', storage: '置干燥处', unit: 'g', description: '消痰软坚散结，利水消肿。' },
+      { name: '昆布', category: '菌藻类', origin: '辽宁、山东', storage: '置干燥处', unit: 'g', description: '消痰软坚散结，利水消肿。' },
+      { name: '百部', category: '根茎类', origin: '安徽、江苏', storage: '置干燥处，防潮，防蛀', unit: 'g', description: '润肺下气止咳，杀虫灭虱。' },
+      { name: '紫菀', category: '根茎类', origin: '河北、安徽', storage: '置阴凉干燥处，防潮', unit: 'g', description: '润肺下气，化痰止咳。' },
+      { name: '款冬花', category: '花类', origin: '河南、甘肃', storage: '置干燥处，防潮，防蛀', unit: 'g', description: '润肺下气，止咳化痰。' },
+      { name: '枇杷叶', category: '叶类', origin: '广东、江苏', storage: '置干燥处', unit: 'g', description: '清肺止咳，降逆止呕。' },
+      { name: '桑白皮', category: '皮类', origin: '安徽、河南', storage: '置通风干燥处，防潮，防蛀', unit: 'g', description: '泻肺平喘，利水消肿。' },
+      { name: '葶苈子', category: '果实种子类', origin: '河北、辽宁', storage: '置干燥处', unit: 'g', description: '泻肺平喘，行水消肿。' },
+      { name: '白果', category: '果实种子类', origin: '广西、四川', storage: '置通风干燥处', unit: 'g', description: '敛肺定喘，止带缩尿。' },
+      { name: '朱砂', category: '矿物类', origin: '湖南、贵州', storage: '置干燥处', unit: 'g', description: '清心镇惊，安神，明目，解毒。' },
+      { name: '磁石', category: '矿物类', origin: '河北、山东', storage: '置干燥处', unit: 'g', description: '镇惊安神，平肝潜阳，聪耳明目，纳气平喘。' },
+      { name: '龙骨', category: '矿物类', origin: '山西、内蒙古', storage: '置干燥处', unit: 'g', description: '镇惊安神，平肝潜阳，收敛固涩。' },
+      { name: '琥珀', category: '其他', origin: '云南、河南', storage: '密闭，置阴凉干燥处', unit: 'g', description: '镇惊安神，活血散瘀，利尿通淋。' },
+      { name: '酸枣仁', category: '果实种子类', origin: '河北、陕西', storage: '置阴凉干燥处，防蛀', unit: 'g', description: '养心补肝，宁心安神，敛汗，生津。' },
+      { name: '柏子仁', category: '果实种子类', origin: '山东、河南', storage: '置阴凉干燥处，防热，防蛀', unit: 'g', description: '养心安神，润肠通便，止汗。' },
+      { name: '灵芝', category: '菌藻类', origin: '安徽、江西', storage: '置干燥处，防霉，防蛀', unit: 'g', description: '补气安神，止咳平喘。' },
+      { name: '首乌藤', category: '藤木类', origin: '河南、湖北', storage: '置干燥处', unit: 'g', description: '养血安神，祛风通络。' },
+      { name: '合欢皮', category: '皮类', origin: '湖北、江苏', storage: '置通风干燥处', unit: 'g', description: '解郁安神，活血消肿。' },
+      { name: '远志', category: '根茎类', origin: '山西、陕西', storage: '置通风干燥处', unit: 'g', description: '安神益智，交通心肾，祛痰，消肿。' },
+      { name: '石菖蒲', category: '根茎类', origin: '四川、浙江', storage: '置干燥处，防霉', unit: 'g', description: '开窍豁痰，醒神益智，化湿开胃。' },
+      { name: '羚羊角', category: '动物类', origin: '新疆、青海', storage: '置阴凉干燥处', unit: 'g', description: '平肝息风，清肝明目，清热解毒。' },
+      { name: '牛黄', category: '动物类', origin: '北京、河北', storage: '遮光，密闭，置阴凉干燥处', unit: 'g', description: '凉肝息风，清心豁痰，开窍醒神，清热解毒。' },
+      { name: '钩藤', category: '藤木类', origin: '广西、江西', storage: '置干燥处', unit: 'g', description: '息风定惊，清热平肝。' },
+      { name: '天麻', category: '根茎类', origin: '云南、四川', storage: '置通风干燥处，防蛀', unit: 'g', description: '息风止痉，平抑肝阳，祛风通络。' },
+      { name: '地龙', category: '动物类', origin: '广东、广西', storage: '置通风干燥处，防霉，防蛀', unit: 'g', description: '清热定惊，通络，平喘，利尿。' },
+      { name: '全蝎', category: '动物类', origin: '河南、山东', storage: '置干燥处，防蛀', unit: 'g', description: '息风镇痉，通络止痛，攻毒散结。' },
+      { name: '蜈蚣', category: '动物类', origin: '湖北、浙江', storage: '置干燥处，防霉，防蛀', unit: 'g', description: '息风镇痉，通络止痛，攻毒散结。' },
+      { name: '僵蚕', category: '动物类', origin: '浙江、江苏', storage: '置干燥处，防蛀', unit: 'g', description: '息风止痉，祛风止痛，化痰散结。' },
+      { name: '麝香', category: '动物类', origin: '四川、西藏', storage: '密闭，置阴凉干燥处，遮光', unit: 'g', description: '开窍醒神，活血通经，消肿止痛。' },
+      { name: '冰片', category: '其他', origin: '上海、天津', storage: '密闭，置阴凉干燥处', unit: 'g', description: '开窍醒神，清热止痛。' },
+      { name: '苏合香', category: '其他', origin: '土耳其、埃及（进口）', storage: '密闭，置阴凉干燥处', unit: 'g', description: '开窍，辟秽，止痛。' },
+      { name: '西洋参', category: '根茎类', origin: '美国、加拿大（进口）', storage: '置阴凉干燥处，密闭，防蛀', unit: 'g', description: '补气养阴，清热生津。' },
+      { name: '党参', category: '根茎类', origin: '山西、甘肃', storage: '置通风干燥处，防蛀', unit: 'g', description: '健脾益肺，养血生津。' },
+      { name: '太子参', category: '根茎类', origin: '江苏、山东', storage: '置通风干燥处，防潮，防蛀', unit: 'g', description: '益气健脾，生津润肺。' },
+      { name: '白扁豆', category: '果实种子类', origin: '安徽、陕西', storage: '置干燥处，防蛀', unit: 'g', description: '健脾化湿，和中消暑。' },
+      { name: '大枣', category: '果实种子类', origin: '河北、河南', storage: '置干燥处，防蛀', unit: 'g', description: '补中益气，养血安神。' },
+      { name: '蜂蜜', category: '其他', origin: '全国大部分地区', storage: '置阴凉干燥处', unit: 'g', description: '补中，润燥，止痛，解毒；外用生肌敛疮。' },
+      { name: '鹿茸', category: '动物类', origin: '吉林、辽宁', storage: '置阴凉干燥处，密闭，防蛀', unit: 'g', description: '壮肾阳，益精血，强筋骨，调冲任，托疮毒。' },
+      { name: '紫河车', category: '动物类', origin: '全国大部分地区', storage: '置干燥处，防蛀', unit: 'g', description: '温肾补精，益气养血。' },
+      { name: '仙茅', category: '根茎类', origin: '四川、云南', storage: '置干燥处，防霉，防蛀', unit: 'g', description: '补肾阳，强筋骨，祛寒湿。' },
+      { name: '补骨脂', category: '果实种子类', origin: '四川、河南', storage: '置干燥处', unit: 'g', description: '补肾壮阳，固精缩尿，温脾止泻，纳气平喘。' },
+      { name: '益智仁', category: '果实种子类', origin: '海南、广东', storage: '置阴凉干燥处', unit: 'g', description: '温脾止泻摄唾，暖肾固精缩尿。' },
+      { name: '沙苑子', category: '果实种子类', origin: '陕西、河北', storage: '置通风干燥处', unit: 'g', description: '补肾助阳，固精缩尿，养肝明目。' },
+      { name: '蛤蚧', category: '动物类', origin: '广西、云南', storage: '置阴凉干燥处，防蛀', unit: 'g', description: '补肺益肾，纳气定喘，助阳益精。' },
+      { name: '冬虫夏草', category: '菌藻类', origin: '四川、青海', storage: '置阴凉干燥处，防蛀', unit: 'g', description: '补肾益肺，止血化痰。' },
+      { name: '韭菜子', category: '果实种子类', origin: '河北、山西', storage: '置干燥处', unit: 'g', description: '温补肝肾，壮阳固精。' },
+      { name: '海马', category: '动物类', origin: '广东、福建', storage: '置阴凉干燥处，防蛀', unit: 'g', description: '温肾壮阳，散结消肿。' },
+      { name: '何首乌', category: '根茎类', origin: '河南、湖北', storage: '置干燥处，防蛀', unit: 'g', description: '制用：补肝肾，益精血，乌须发，强筋骨，化浊降脂。生用：解毒，消痈，截疟，润肠通便。' },
+      { name: '阿胶', category: '动物类', origin: '山东东阿', storage: '密闭，置阴凉干燥处', unit: 'g', description: '补血滋阴，润燥，止血。' },
+      { name: '龙眼肉', category: '果实种子类', origin: '广东、广西', storage: '置通风干燥处，防潮，防蛀', unit: 'g', description: '补益心脾，养血安神。' },
+      { name: '北沙参', category: '根茎类', origin: '山东、河北', storage: '置通风干燥处，防蛀', unit: 'g', description: '养阴清肺，益胃生津。' },
+      { name: '南沙参', category: '根茎类', origin: '安徽、江苏', storage: '置通风干燥处，防蛀', unit: 'g', description: '养阴清肺，益胃生津，化痰，益气。' },
+      { name: '百合', category: '果实种子类', origin: '湖南、甘肃', storage: '置通风干燥处', unit: 'g', description: '养阴润肺，清心安神。' },
+      { name: '麦冬', category: '根茎类', origin: '浙江、四川', storage: '置阴凉干燥处，防潮', unit: 'g', description: '养阴生津，润肺清心。' },
+      { name: '天冬', category: '根茎类', origin: '贵州、四川', storage: '置通风干燥处，防霉，防蛀', unit: 'g', description: '养阴润燥，清肺生津。' },
+      { name: '石斛', category: '根茎类', origin: '安徽、云南', storage: '置通风干燥处，防潮', unit: 'g', description: '益胃生津，滋阴清热。' },
+      { name: '玉竹', category: '根茎类', origin: '湖南、河南', storage: '置通风干燥处，防霉，防蛀', unit: 'g', description: '养阴润燥，生津止渴。' },
+      { name: '黄精', category: '根茎类', origin: '贵州、湖南', storage: '置通风干燥处，防霉，防蛀', unit: 'g', description: '补气养阴，健脾，润肺，益肾。' },
+      { name: '墨旱莲', category: '全草类', origin: '江苏、浙江', storage: '置通风干燥处', unit: 'g', description: '滋补肝肾，凉血止血。' },
+      { name: '女贞子', category: '果实种子类', origin: '浙江、江苏', storage: '置干燥处', unit: 'g', description: '滋补肝肾，明目乌发。' },
+      { name: '桑椹', category: '果实种子类', origin: '全国大部分地区', storage: '置通风干燥处', unit: 'g', description: '滋阴补血，生津润燥。' },
+      { name: '黑芝麻', category: '果实种子类', origin: '山东、河南', storage: '置通风干燥处，防蛀', unit: 'g', description: '补肝肾，益精血，润肠燥。' },
+      { name: '龟甲', category: '动物类', origin: '湖北、湖南', storage: '置干燥处，防蛀', unit: 'g', description: '滋阴潜阳，益肾强骨，养血补心，固经止崩。' },
+      { name: '鳖甲', category: '动物类', origin: '湖北、安徽', storage: '置干燥处，防蛀', unit: 'g', description: '滋阴潜阳，退热除蒸，软坚散结。' },
+      { name: '五味子', category: '果实种子类', origin: '辽宁、吉林', storage: '置通风干燥处，防霉', unit: 'g', description: '收敛固涩，益气生津，补肾宁心。' },
+      { name: '乌梅', category: '果实种子类', origin: '四川、浙江', storage: '置阴凉干燥处，防潮', unit: 'g', description: '敛肺，涩肠，生津，安蛔。' },
+      { name: '五倍子', category: '其他', origin: '四川、贵州', storage: '置通风干燥处，防蛀', unit: 'g', description: '敛肺降火，涩肠止泻，敛汗，固精止遗，止血，收湿敛疮。' },
+      { name: '诃子', category: '果实种子类', origin: '云南、广东', storage: '置干燥处', unit: 'g', description: '涩肠止泻，敛肺止咳，降火利咽。' },
+      { name: '肉豆蔻', category: '果实种子类', origin: '印度尼西亚、马来西亚（进口）', storage: '置阴凉干燥处，防蛀', unit: 'g', description: '温中行气，涩肠止泻。' },
+      { name: '赤石脂', category: '矿物类', origin: '福建、山东', storage: '置干燥处，防潮', unit: 'g', description: '涩肠，止血，生肌敛疮。' },
+      { name: '覆盆子', category: '果实种子类', origin: '浙江、福建', storage: '置干燥处', unit: 'g', description: '益肾固精缩尿，养肝明目。' },
+      { name: '桑螵蛸', category: '动物类', origin: '广西、云南', storage: '置干燥处，防蛀', unit: 'g', description: '固精缩尿，补肾助阳。' },
+      { name: '金樱子', category: '果实种子类', origin: '广东、湖南', storage: '置通风干燥处，防蛀', unit: 'g', description: '固精缩尿，固崩止带，涩肠止泻。' },
+      { name: '海螵蛸', category: '动物类', origin: '浙江、福建', storage: '置干燥处', unit: 'g', description: '收敛止血，涩精止带，制酸止痛，收湿敛疮。' },
+      { name: '莲子', category: '果实种子类', origin: '湖南、福建', storage: '置干燥处，防蛀', unit: 'g', description: '补脾止泻，止带，益肾涩精，养心安神。' },
+      { name: '芡实', category: '果实种子类', origin: '江苏、山东', storage: '置通风干燥处，防蛀', unit: 'g', description: '益肾固精，补脾止泻，除湿止带。' },
+      { name: '椿皮', category: '皮类', origin: '全国大部分地区', storage: '置通风干燥处', unit: 'g', description: '清热燥湿，收涩止带，止泻，止血。' },
+      { name: '雄黄', category: '矿物类', origin: '湖南、贵州', storage: '置干燥处，密闭', unit: 'g', description: '解毒杀虫，燥湿祛痰，截疟。' },
+      { name: '硫黄', category: '矿物类', origin: '山西、陕西', storage: '置干燥处，防火', unit: 'g', description: '外用解毒杀虫疗疮；内服补火助阳通便。' },
+      { name: '白矾', category: '矿物类', origin: '甘肃、山西', storage: '置干燥处', unit: 'g', description: '外用解毒杀虫，燥湿止痒；内服止血止泻，祛除风痰。' },
+      { name: '蛇床子', category: '果实种子类', origin: '河北、山东', storage: '置干燥处', unit: 'g', description: '燥湿祛风，杀虫止痒，温肾壮阳。' },
+      { name: '土荆皮', category: '皮类', origin: '浙江、安徽', storage: '置干燥处', unit: 'g', description: '杀虫，疗癣，止痒。' },
+      { name: '蜂房', category: '动物类', origin: '全国大部分地区', storage: '置干燥处，防压，防蛀', unit: 'g', description: '攻毒杀虫，祛风止痛。' },
+      { name: '大蒜', category: '其他', origin: '全国大部分地区', storage: '置阴凉干燥处', unit: 'g', description: '解毒消肿，杀虫，止痢。' },
+      { name: '蟾酥', category: '动物类', origin: '河北、山东', storage: '置干燥处，防潮', unit: 'g', description: '解毒，止痛，开窍醒神。' },
+      { name: '樟脑', category: '其他', origin: '台湾、贵州', storage: '密闭，置阴凉干燥处', unit: 'g', description: '通关窍，利滞气，辟秽浊，杀虫止痒，消肿止痛。' },
+      { name: '炉甘石', category: '矿物类', origin: '广西、四川', storage: '置干燥处', unit: 'g', description: '解毒明目退翳，收湿止痒敛疮。' },
+      { name: '硼砂', category: '矿物类', origin: '青海、西藏', storage: '置干燥处', unit: 'g', description: '外用清热解毒，内服清肺化痰。' }
+    ];
+
+    // 日志工具（日志由后端写入 MySQL，本地不再保存）
+    function getLogs() { return []; }
+    function saveLogs(logs) {}
+    function cleanupOldLogs() { return []; }
+    function addLog(herbCode, herbName, action, changes) {}
+    function diffHerbs(oldHerb, newHerb) {
+      const changes = [];
+      ['name','category','origin','storage','unit','price','quantity','description','warningThreshold'].forEach(field => {
+        if (String(oldHerb[field]) !== String(newHerb[field])) {
+          changes.push({ field, label: FIELD_LABELS[field] || field, oldValue: oldHerb[field], newValue: newHerb[field] });
+        }
+      });
+      return changes;
+    }
+    function getWarningThreshold(herbName) {
+      return PRECIOUS_HERBS.includes(herbName) ? PRECIOUS_WARNING_THRESHOLD : DEFAULT_WARNING_THRESHOLD;
+    }
+
+    // 快速调库全局函数
+    let currentAdjustHerb = null;
+    function adjustInput(delta) {
+      const input = document.getElementById('adjust-amount');
+      input.value = parseInt(input.value || 0) + delta;
+      updateAdjustPreview();
+    }
+    function updateAdjustPreview() {
+      if (!currentAdjustHerb) return;
+      const amount = parseInt(document.getElementById('adjust-amount').value) || 0;
+      const newQty = currentAdjustHerb.quantity + amount;
+      const previewEl = document.getElementById('adjust-preview-qty');
+      const boxEl = document.getElementById('adjust-preview-box');
+      previewEl.textContent = newQty + ' ' + currentAdjustHerb.unit;
+      if (newQty < 0) {
+        previewEl.className = 'text-lg font-bold text-red-600';
+        boxEl.className = 'mb-4 p-3 rounded-lg bg-red-50';
+      } else if (newQty <= (currentAdjustHerb.warningThreshold || DEFAULT_WARNING_THRESHOLD)) {
+        previewEl.className = 'text-lg font-bold text-yellow-600';
+        boxEl.className = 'mb-4 p-3 rounded-lg bg-yellow-50';
+      } else {
+        previewEl.className = 'text-lg font-bold text-primary';
+        boxEl.className = 'mb-4 p-3 rounded-lg bg-green-50';
+      }
+    }
+
+    document.addEventListener('DOMContentLoaded', () => {
+      cleanupOldLogs();
+
+      document.getElementById('sidebar-toggle').addEventListener('click', () => {
+        document.getElementById('sidebar').classList.toggle('-translate-x-full');
+      });
+
+      const currentUser = sessionStorage.getItem('current_user');
+      const currentRole = sessionStorage.getItem('current_role');
+      const currentName = sessionStorage.getItem('current_name') || currentUser;
+      if (!currentUser) window.location.href = 'index.html';
+
+      const roleText = { admin: '管理员', doctor: '医生', patient: '病人' };
+      document.getElementById('welcome-message').textContent = `欢迎，${currentName}`;
+      document.getElementById('sidebar-username').textContent = currentName;
+      document.getElementById('sidebar-role').textContent = roleText[currentRole] || '用户';
+
+      document.querySelectorAll('#sidebar-nav > a').forEach(item => {
+        const allowedRoles = item.dataset.role.split(',');
+        if (!allowedRoles.includes(currentRole)) item.classList.add('hidden');
+      });
+
+      if (currentRole !== 'admin') {
+        document.getElementById('smart-hint').textContent = '药材信息查询与浏览';
+      }
+
+      const isReadOnly = currentRole === 'patient';
+      if (isReadOnly) document.getElementById('add-herb-btn').classList.add('hidden');
+
+      const addHerbBtn = document.getElementById('add-herb-btn');
+      const addHerbModal = document.getElementById('add-herb-modal');
+      const closeModalBtn = document.getElementById('close-modal-btn');
+      const cancelAddHerb = document.getElementById('cancel-add-herb');
+      const addHerbForm = document.getElementById('add-herb-form');
+      const herbEmptyState = document.getElementById('herb-empty-state');
+      const herbTableContainer = document.getElementById('herb-table-container');
+      const herbTableBody = document.getElementById('herb-table-body');
+      const deleteHerbModal = document.getElementById('delete-herb-modal');
+      const cancelDeleteHerb = document.getElementById('cancel-delete-herb');
+      const confirmDeleteHerb = document.getElementById('confirm-delete-herb');
+      const deleteHerbMessage = document.getElementById('delete-herb-message');
+      const searchInput = document.getElementById('search-input');
+      const searchBtn = document.getElementById('search-btn');
+      const herbNameInput = document.getElementById('herb-name');
+      const smartSuggestBox = document.getElementById('smart-suggest-box');
+      const smartMatchBadge = document.getElementById('smart-match-badge');
+
+      const HERBS_KEY = 'herbs';
+      let currentHerbId = null;
+      let currentFilter = '';
+
+      // 从后端获取全部药材
+      const getHerbs = async () => await api('GET', '/api/herbs');
+
+      // 智能匹配
+      let isSelecting = false;
+      herbNameInput.addEventListener('input', () => {
+        if (isSelecting) { isSelecting = false; return; }
+        const keyword = herbNameInput.value.trim();
+        smartMatchBadge.classList.add('hidden');
+        if (!keyword) { smartSuggestBox.classList.add('hidden'); return; }
+        const matches = HERB_DATABASE.filter(h => h.name.includes(keyword) || keyword.includes(h.name)).slice(0, 8);
+        if (matches.length === 0) { smartSuggestBox.classList.add('hidden'); return; }
+        smartSuggestBox.innerHTML = matches.map(h => `
+          <div class="smart-suggest-item" data-name="${h.name}">
+            <div class="name">${h.name} <span class="text-xs text-gray-400 font-normal">${h.category}</span></div>
+            <div class="meta"><i class="fa fa-map-marker"></i> ${h.origin}</div>
+          </div>
+        `).join('');
+        smartSuggestBox.classList.remove('hidden');
+        smartSuggestBox.querySelectorAll('.smart-suggest-item').forEach(item => {
+          item.addEventListener('mousedown', (e) => {
+            e.preventDefault();
+            applySmartMatch(item.getAttribute('data-name'));
+          });
+        });
+      });
+
+      document.addEventListener('click', (e) => {
+        if (!herbNameInput.contains(e.target) && !smartSuggestBox.contains(e.target)) {
+          smartSuggestBox.classList.add('hidden');
+        }
+      });
+
+      function applySmartMatch(name) {
+        const herb = HERB_DATABASE.find(h => h.name === name);
+        if (!herb) return;
+        isSelecting = true;
+        herbNameInput.value = herb.name;
+        document.getElementById('herb-category').value = herb.category;
+        document.getElementById('herb-origin').value = herb.origin;
+        document.getElementById('herb-storage').value = herb.storage;
+        document.getElementById('herb-unit').value = herb.unit;
+        document.getElementById('herb-description').value = herb.description;
+        const threshold = getWarningThreshold(name);
+        document.getElementById('herb-warning-threshold').value = threshold;
+        smartSuggestBox.classList.add('hidden');
+        smartMatchBadge.classList.remove('hidden');
+        ['herb-category','herb-origin','herb-storage','herb-unit','herb-description','herb-warning-threshold'].forEach(id => {
+          const el = document.getElementById(id);
+          el.style.transition = 'background 0.3s';
+          el.style.background = '#e8f5e9';
+          setTimeout(() => { el.style.background = ''; }, 1500);
+        });
+      }
+
+      // 渲染表格
+      const renderHerbTable = async () => {
+        let herbs = await getHerbs();
+        if (currentFilter) {
+          const kw = currentFilter.toLowerCase();
+          herbs = herbs.filter(h =>
+            (h.name && h.name.toLowerCase().includes(kw)) ||
+            (h.category && h.category.toLowerCase().includes(kw)) ||
+            (h.origin && h.origin.toLowerCase().includes(kw))
+          );
+        }
+        herbTableBody.innerHTML = '';
+        if (herbs.length === 0) {
+          herbEmptyState.classList.remove('hidden');
+          herbTableContainer.classList.add('hidden');
+          if (currentFilter) {
+            herbEmptyState.querySelector('h3').textContent = '未找到匹配的药材';
+            herbEmptyState.querySelector('p').textContent = '请尝试其他搜索关键词';
+          }
+          return;
+        }
+        herbEmptyState.classList.add('hidden');
+        herbTableContainer.classList.remove('hidden');
+        herbs.forEach(herb => {
+          const threshold = herb.warningThreshold || DEFAULT_WARNING_THRESHOLD;
+          const isLow = herb.quantity <= threshold;
+          const statusClass = herb.quantity <= 0 ? 'bg-red-100 text-red-800' :
+                              isLow ? 'bg-yellow-100 text-yellow-800' : 'bg-green-100 text-green-800';
+          const statusText = herb.quantity <= 0 ? '缺货' : isLow ? '库存不足' : '充足';
+          const row = document.createElement('tr');
+          row.className = 'hover:bg-gray-50' + (isLow && herb.quantity > 0 ? ' warning-low' : '');
+          const actionHtml = isReadOnly
+            ? '<span class="text-gray-400 text-sm">只读</span>'
+            : `<button class="text-green-600 hover:text-green-900 mr-2 adjust-qty-btn" data-id="${herb.code}" title="快速调整库存"><i class="fa fa-exchange"></i> 调库</button>
+               <button class="text-blue-600 hover:text-blue-900 mr-2 edit-herb-btn" data-id="${herb.code}">编辑</button>
+               <button class="text-red-600 hover:text-red-900 delete-herb-btn" data-id="${herb.code}">删除</button>`;
+          row.innerHTML = `
+            <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-900">${herb.code}</td>
+            <td class="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">${herb.name}</td>
+            <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-900">${herb.category || '-'}</td>
+            <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-900">${herb.origin}</td>
+            <td class="px-6 py-4 whitespace-nowrap text-sm ${isLow ? 'text-red-600 font-bold' : 'text-gray-900'}">${herb.quantity} ${herb.unit}</td>
+            <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">${threshold} ${herb.unit}</td>
+            <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-900">¥${herb.price}</td>
+            <td class="px-6 py-4 whitespace-nowrap"><span class="px-2 inline-flex text-xs leading-5 font-semibold rounded-full ${statusClass}">${statusText}</span></td>
+            <td class="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">${actionHtml}</td>
+          `;
+          herbTableBody.appendChild(row);
+        });
+      };
+
+      const closeModal = () => {
+        addHerbModal.classList.add('hidden');
+        deleteHerbModal.classList.add('hidden');
+        addHerbForm.reset();
+        addHerbForm.removeAttribute('data-editing-id');
+        smartSuggestBox.classList.add('hidden');
+        smartMatchBadge.classList.add('hidden');
+        document.getElementById('qty-field-label').textContent = '初始库存';
+      };
+
+      // 添加药材
+      addHerbBtn.addEventListener('click', () => {
+        document.getElementById('modal-title').textContent = '添加药材';
+        document.getElementById('qty-field-label').textContent = '初始库存';
+        document.getElementById('herb-code').value = `HC${Date.now()}${Math.floor(Math.random() * 1000)}`;
+        document.getElementById('herb-warning-threshold').value = DEFAULT_WARNING_THRESHOLD;
+        addHerbModal.classList.remove('hidden');
+        setTimeout(() => herbNameInput.focus(), 100);
+      });
+
+      // 表格操作事件委托
+      herbTableBody.addEventListener('click', async (e) => {
+        const adjustBtn = e.target.closest('.adjust-qty-btn');
+        const editBtn = e.target.closest('.edit-herb-btn');
+        const deleteBtn = e.target.closest('.delete-herb-btn');
+
+        if (adjustBtn) {
+          const herbId = adjustBtn.getAttribute('data-id');
+          const herbs = await getHerbs();
+          const herb = herbs.find(h => h.code === herbId);
+          if (!herb) return;
+          openQuickAdjust(herb);
+        }
+
+        if (editBtn) {
+          const herbId = editBtn.getAttribute('data-id');
+          const herbs = await getHerbs();
+          const herb = herbs.find(h => h.code === herbId);
+          if (!herb) return;
+          document.getElementById('modal-title').textContent = '编辑药材';
+          document.getElementById('qty-field-label').textContent = '当前库存';
+          document.getElementById('herb-code').value = herb.code;
+          document.getElementById('herb-name').value = herb.name;
+          document.getElementById('herb-category').value = herb.category;
+          document.getElementById('herb-origin').value = herb.origin;
+          document.getElementById('herb-storage').value = herb.storage || '';
+          document.getElementById('herb-unit').value = herb.unit;
+          document.getElementById('herb-price').value = herb.price;
+          document.getElementById('herb-quantity').value = herb.quantity;
+          document.getElementById('herb-warning-threshold').value = herb.warningThreshold || DEFAULT_WARNING_THRESHOLD;
+          document.getElementById('herb-description').value = herb.description || '';
+          addHerbForm.setAttribute('data-editing-id', herbId);
+          addHerbModal.classList.remove('hidden');
+        }
+
+        if (deleteBtn) {
+          const herbId = deleteBtn.getAttribute('data-id');
+          const herbs = await getHerbs();
+          const herb = herbs.find(h => h.code === herbId);
+          if (!herb) return;
+          currentHerbId = herbId;
+          deleteHerbMessage.textContent = `您确定要删除药材 "${herb.name}" 吗？删除操作将记录到日志中，此操作不可撤销。`;
+          deleteHerbModal.classList.remove('hidden');
+        }
+      });
+
+      // 快速调库
+      function openQuickAdjust(herb) {
+        currentAdjustHerb = herb;
+        document.getElementById('adjust-herb-name').textContent = herb.name;
+        document.getElementById('adjust-herb-code').textContent = herb.code;
+        document.getElementById('adjust-current-qty').textContent = herb.quantity + ' ' + herb.unit;
+        document.getElementById('adjust-amount').value = 0;
+        updateAdjustPreview();
+        document.getElementById('quick-adjust-modal').classList.remove('hidden');
+      }
+
+      document.getElementById('close-adjust-modal').addEventListener('click', () => {
+        document.getElementById('quick-adjust-modal').classList.add('hidden');
+        currentAdjustHerb = null;
+      });
+      document.getElementById('cancel-adjust').addEventListener('click', () => {
+        document.getElementById('quick-adjust-modal').classList.add('hidden');
+        currentAdjustHerb = null;
+      });
+      document.getElementById('adjust-amount').addEventListener('input', updateAdjustPreview);
+
+      document.getElementById('confirm-adjust').addEventListener('click', async () => {
+        if (!currentAdjustHerb) return;
+        const amount = parseInt(document.getElementById('adjust-amount').value) || 0;
+        if (amount === 0) { alert('请输入调整数量'); return; }
+
+        const oldHerb = currentAdjustHerb;
+        const newQty = oldHerb.quantity + amount;
+        if (newQty < 0) { alert('调整后库存不能为负数'); return; }
+
+        try {
+          await api('POST', `/api/herbs/${oldHerb.code}/adjust`, { amount });
+          alert(`库存调整成功！${oldHerb.name}：${oldHerb.quantity} → ${newQty} ${oldHerb.unit}`);
+          document.getElementById('quick-adjust-modal').classList.add('hidden');
+          currentAdjustHerb = null;
+          await renderHerbTable();
+        } catch (e) {
+          alert(e.message || '库存调整失败');
+        }
+      });
+
+      // 表单提交
+      addHerbForm.addEventListener('submit', async (e) => {
+        e.preventDefault();
+        const herbData = {
+          code: document.getElementById('herb-code').value,
+          name: document.getElementById('herb-name').value.trim(),
+          category: document.getElementById('herb-category').value,
+          origin: document.getElementById('herb-origin').value.trim(),
+          storage: document.getElementById('herb-storage').value.trim(),
+          unit: document.getElementById('herb-unit').value.trim(),
+          price: parseFloat(document.getElementById('herb-price').value),
+          quantity: parseInt(document.getElementById('herb-quantity').value),
+          warningThreshold: parseInt(document.getElementById('herb-warning-threshold').value) || DEFAULT_WARNING_THRESHOLD,
+          description: document.getElementById('herb-description').value.trim()
+        };
+        if (!herbData.name || !herbData.code || !herbData.category || !herbData.origin || !herbData.unit ||
+            isNaN(herbData.price) || isNaN(herbData.quantity)) {
+          alert('请填写所有必填字段');
+          return;
+        }
+        const editingId = addHerbForm.getAttribute('data-editing-id');
+        try {
+          if (editingId) {
+            await api('PUT', '/api/herbs/' + encodeURIComponent(editingId), herbData);
+            alert('药材更新成功！已记录操作日志。');
+          } else {
+            await api('POST', '/api/herbs', herbData);
+            alert('药材添加成功！已记录操作日志。');
+          }
+          closeModal();
+          await renderHerbTable();
+        } catch (err) {
+          alert(err.message || '保存失败');
+        }
+      });
+
+      // 确认删除
+      confirmDeleteHerb.addEventListener('click', async () => {
+        if (!currentHerbId) return;
+        try {
+          await api('DELETE', '/api/herbs/' + encodeURIComponent(currentHerbId));
+          currentHerbId = null;
+          closeModal();
+          await renderHerbTable();
+          alert('药材删除成功！已记录操作日志。');
+        } catch (e) {
+          alert(e.message || '删除失败');
+        }
+      });
+
+      searchBtn.addEventListener('click', () => {
+        currentFilter = searchInput.value.trim();
+        renderHerbTable();
+      });
+      searchInput.addEventListener('keypress', (e) => {
+        if (e.key === 'Enter') { currentFilter = searchInput.value.trim(); renderHerbTable(); }
+      });
+
+      document.getElementById('logout-btn').addEventListener('click', () => {
+        sessionStorage.removeItem('current_user');
+        sessionStorage.removeItem('current_role');
+        sessionStorage.removeItem('current_name');
+        sessionStorage.removeItem('stock_warning_shown');
+        window.location.href = 'index.html';
+      });
+
+      closeModalBtn.addEventListener('click', closeModal);
+      cancelAddHerb.addEventListener('click', closeModal);
+      cancelDeleteHerb.addEventListener('click', closeModal);
+      [addHerbModal, deleteHerbModal, document.getElementById('quick-adjust-modal')].forEach(modal => {
+        modal.addEventListener('click', (e) => { if (e.target === modal) closeModal(); });
+      });
+
+      renderHerbTable();
+    });
+  </script>
+</body>
+</html>

@@ -1,0 +1,343 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>本草智管平台</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <link href="https://cdn.jsdelivr.net/npm/font-awesome@4.7.0/css/font-awesome.min.css" rel="stylesheet">
+  <script>
+    tailwind.config = {
+      theme: {
+        extend: {
+          colors: {
+            primary: '#2E7D32',
+            secondary: '#8D6E63',
+            accent: '#D32F2F',
+            neutral: '#F5F5F5',
+          }
+        }
+      }
+    }
+  </script>
+  <style>
+    body, html {
+      margin: 0;
+      padding: 0;
+      height: 100%;
+      overflow: hidden;
+    }
+    .bg-herb {
+      background: linear-gradient(135deg, #e8f5e9 0%, #a5d6a7 100%);
+      position: absolute;
+      top: 0;
+      left: 0;
+      width: 100%;
+      height: 100%;
+      z-index: -1;
+    }
+    .form-container {
+      position: relative;
+      z-index: 2;
+      padding: 40px;
+      background: white;
+      margin: auto;
+      top: 50%;
+      transform: translateY(-50%);
+      border-radius: 12px;
+      box-shadow: 0 10px 30px rgba(0,0,0,0.1);
+      max-width: 460px;
+      width: 90%;
+    }
+    .form-title {
+      font-size: 24px;
+      font-weight: bold;
+      color: #2E7D32;
+      margin-bottom: 24px;
+      text-align: center;
+    }
+    .tab-button {
+      padding: 10px 20px;
+      font-size: 16px;
+      font-weight: 500;
+      border: none;
+      background: transparent;
+      cursor: pointer;
+      transition: all 0.3s;
+      color: #666;
+    }
+    .tab-button.active {
+      color: #2E7D32;
+      border-bottom: 2px solid #2E7D32;
+    }
+    .role-tab {
+      padding: 8px 16px;
+      font-size: 14px;
+      border-radius: 6px;
+      border: 1px solid #ddd;
+      background: #f9f9f9;
+      cursor: pointer;
+      transition: all 0.3s;
+    }
+    .role-tab.active {
+      background: #2E7D32;
+      color: white;
+      border-color: #2E7D32;
+    }
+    .form-input {
+      width: 100%;
+      padding: 12px;
+      margin-bottom: 14px;
+      border: 1px solid #ccc;
+      border-radius: 6px;
+      transition: border-color 0.3s;
+      font-size: 14px;
+      box-sizing: border-box;
+    }
+    .form-input:focus {
+      outline: none;
+      border-color: #2E7D32;
+      box-shadow: 0 0 0 2px rgba(46,125,50,0.1);
+    }
+    .form-button {
+      width: 100%;
+      padding: 12px;
+      background-color: #2E7D32;
+      color: white;
+      border: none;
+      border-radius: 6px;
+      cursor: pointer;
+      transition: background-color 0.3s;
+      font-size: 16px;
+      font-weight: 500;
+    }
+    .form-button:hover {
+      background-color: #226125;
+    }
+  </style>
+</head>
+<body>
+  <div class="bg-herb"></div>
+
+  <div class="form-container">
+    <div class="form-title">
+      <i class="fa fa-leaf mr-2"></i>本草智管平台
+    </div>
+
+    <!-- 登录/注册切换 -->
+    <div class="flex justify-center mb-6">
+      <button id="login-tab" class="tab-button active">登录</button>
+      <button id="register-tab" class="tab-button">注册</button>
+    </div>
+
+    <!-- 登录表单 -->
+    <div id="login-form">
+      <input type="text" id="login-username" class="form-input" placeholder="请输入用户名">
+      <input type="password" id="login-password" class="form-input" placeholder="请输入密码">
+      <div class="flex items-center justify-between mb-4">
+        <div class="flex items-center">
+          <input id="remember-me" type="checkbox" class="h-4 w-4 text-primary focus:ring-primary border-gray-300 rounded">
+          <label for="remember-me" class="ml-2 text-sm text-gray-700">记住我</label>
+        </div>
+      </div>
+      <button type="button" id="login-btn" class="form-button">
+        <i class="fa fa-sign-in mr-2"></i> 登录
+      </button>
+      <p class="text-center text-sm text-gray-500 mt-4">
+        测试账号：admin / 123456（管理员）
+      </p>
+    </div>
+
+    <!-- 注册表单 -->
+    <div id="register-form" class="hidden">
+      <!-- 角色选择 -->
+      <div class="flex justify-center gap-3 mb-5">
+        <button class="role-tab active" data-role="admin">管理员</button>
+        <button class="role-tab" data-role="doctor">医生</button>
+        <button class="role-tab" data-role="patient">病人</button>
+      </div>
+
+      <!-- 通用字段 -->
+      <input type="text" id="reg-username" class="form-input" placeholder="用户名 *">
+      <input type="password" id="reg-password" class="form-input" placeholder="密码 *">
+      <input type="password" id="reg-confirm-password" class="form-input" placeholder="确认密码 *">
+      <input type="text" id="reg-name" class="form-input" placeholder="真实姓名 *">
+      <input type="text" id="reg-phone" class="form-input" placeholder="联系电话 *">
+
+      <!-- 管理员专属 -->
+      <div id="admin-fields">
+        <input type="password" id="reg-admin-key" class="form-input" placeholder="管理员注册密钥 *">
+        <p class="text-xs text-gray-500 mb-3">提示：管理员密钥需向系统管理员获取</p>
+      </div>
+
+      <!-- 医生专属 -->
+      <div id="doctor-fields" class="hidden">
+        <input type="text" id="reg-department" class="form-input" placeholder="所属科室 *">
+        <input type="text" id="reg-license" class="form-input" placeholder="执业医师证号 *">
+      </div>
+
+      <!-- 病人专属 -->
+      <div id="patient-fields" class="hidden">
+        <div class="flex gap-3 mb-3">
+          <select id="reg-gender" class="form-input" style="margin-bottom:0;">
+            <option value="">性别</option>
+            <option value="男">男</option>
+            <option value="女">女</option>
+          </select>
+          <input type="number" id="reg-age" class="form-input" placeholder="年龄" style="margin-bottom:0;">
+        </div>
+        <input type="text" id="reg-idcard" class="form-input" placeholder="身份证号">
+      </div>
+
+      <button type="button" id="register-btn" class="form-button mt-2">
+        <i class="fa fa-user-plus mr-2"></i> 注册
+      </button>
+    </div>
+  </div>
+
+  <script>
+    // ===== 后端 API 辅助层 =====
+    const API_BASE = '';
+    async function api(method, url, body) {
+      const opts = { method: method, headers: { 'Content-Type': 'application/json' } };
+      if (body !== undefined) opts.body = JSON.stringify(body);
+      const resp = await fetch(API_BASE + url, opts);
+      const result = await resp.json().catch(() => ({ code: -1, message: '服务器连接失败' }));
+      if (result.code !== 0) throw new Error(result.message);
+      return result.data;
+    }
+
+    const USERS_KEY = 'herb_management_system_users';
+    const ADMIN_REGISTER_KEY = 'admin123';
+
+    document.addEventListener('DOMContentLoaded', function() {
+      initMainTabs();
+      initRoleTabs();
+      initAuthHandlers();
+      checkLoggedIn();
+    });
+
+    function initMainTabs() {
+      const loginTab = document.getElementById('login-tab');
+      const registerTab = document.getElementById('register-tab');
+      const loginForm = document.getElementById('login-form');
+      const registerForm = document.getElementById('register-form');
+
+      loginTab.addEventListener('click', () => {
+        loginTab.classList.add('active');
+        registerTab.classList.remove('active');
+        loginForm.classList.remove('hidden');
+        registerForm.classList.add('hidden');
+      });
+
+      registerTab.addEventListener('click', () => {
+        registerTab.classList.add('active');
+        loginTab.classList.remove('active');
+        registerForm.classList.remove('hidden');
+        loginForm.classList.add('hidden');
+      });
+    }
+
+    function initRoleTabs() {
+      const roleTabs = document.querySelectorAll('.role-tab');
+      const adminFields = document.getElementById('admin-fields');
+      const doctorFields = document.getElementById('doctor-fields');
+      const patientFields = document.getElementById('patient-fields');
+
+      roleTabs.forEach(tab => {
+        tab.addEventListener('click', () => {
+          roleTabs.forEach(t => t.classList.remove('active'));
+          tab.classList.add('active');
+
+          const role = tab.dataset.role;
+          adminFields.classList.add('hidden');
+          doctorFields.classList.add('hidden');
+          patientFields.classList.add('hidden');
+
+          if (role === 'admin') adminFields.classList.remove('hidden');
+          if (role === 'doctor') doctorFields.classList.remove('hidden');
+          if (role === 'patient') patientFields.classList.remove('hidden');
+        });
+      });
+    }
+
+    function initAuthHandlers() {
+      document.getElementById('login-btn').addEventListener('click', handleLogin);
+      document.getElementById('register-btn').addEventListener('click', handleRegister);
+    }
+
+    async function handleLogin() {
+      const username = document.getElementById('login-username').value.trim();
+      const password = document.getElementById('login-password').value;
+
+      if (!username || !password) {
+        alert('请填写用户名和密码');
+        return;
+      }
+
+      try {
+        const data = await api('POST', '/api/login', { username, password });
+        sessionStorage.setItem('current_user', data.username);
+        sessionStorage.setItem('current_role', data.role);
+        sessionStorage.setItem('current_name', data.name || username);
+        window.location.href = 'dashboard.html';
+      } catch (e) {
+        alert(e.message || '登录失败');
+      }
+    }
+
+    async function handleRegister() {
+      const username = document.getElementById('reg-username').value.trim();
+      const password = document.getElementById('reg-password').value;
+      const confirmPwd = document.getElementById('reg-confirm-password').value;
+      const name = document.getElementById('reg-name').value.trim();
+      const phone = document.getElementById('reg-phone').value.trim();
+      const currentRole = document.querySelector('.role-tab.active').dataset.role;
+
+      if (!username || !password || !confirmPwd || !name || !phone) {
+        alert('请填写所有必填字段');
+        return;
+      }
+      if (password !== confirmPwd) {
+        alert('两次输入的密码不一致');
+        return;
+      }
+
+      const userData = { username, password, name, phone, role: currentRole };
+
+      if (currentRole === 'admin') {
+        const adminKey = document.getElementById('reg-admin-key').value;
+        userData.adminKey = adminKey;
+      } else if (currentRole === 'doctor') {
+        const department = document.getElementById('reg-department').value.trim();
+        const license = document.getElementById('reg-license').value.trim();
+        if (!department || !license) {
+          alert('请填写科室和执业证号');
+          return;
+        }
+        userData.department = department;
+        userData.license = license;
+      } else if (currentRole === 'patient') {
+        userData.gender = document.getElementById('reg-gender').value;
+        userData.age = document.getElementById('reg-age').value;
+        userData.idcard = document.getElementById('reg-idcard').value.trim();
+      }
+
+      try {
+        await api('POST', '/api/register', userData);
+        alert('注册成功！请使用账号登录');
+        document.getElementById('login-tab').click();
+        document.getElementById('login-username').value = username;
+      } catch (e) {
+        alert(e.message || '注册失败');
+      }
+    }
+
+    function checkLoggedIn() {
+      if (sessionStorage.getItem('current_user')) {
+        window.location.href = 'dashboard.html';
+      }
+    }
+  </script>
+</body>
+</html>

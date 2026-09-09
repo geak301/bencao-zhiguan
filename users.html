@@ -1,0 +1,544 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>用户管理 - 本草智管平台</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <link href="https://cdn.jsdelivr.net/npm/font-awesome@4.7.0/css/font-awesome.min.css" rel="stylesheet">
+  <script>
+    tailwind.config = {
+      theme: {
+        extend: {
+          colors: {
+            primary: '#2E7D32',
+            secondary: '#8D6E63',
+            accent: '#D32F2F',
+            neutral: '#F5F5F5',
+          }
+        }
+      }
+    }
+  </script>
+  <style>
+    .sidebar-item-active {
+      background-color: rgba(46,125,50,0.1);
+      color: #2E7D32;
+      border-left: 4px solid #2E7D32;
+    }
+  </style>
+</head>
+<body class="bg-neutral min-h-screen flex flex-col">
+  <!-- 顶部导航 -->
+  <header class="bg-primary text-white py-4 px-6 flex items-center justify-between shadow-lg">
+    <div class="flex items-center">
+      <button id="sidebar-toggle" class="mr-4 md:hidden">
+        <i class="fa fa-bars text-xl"></i>
+      </button>
+      <i class="fa fa-leaf mr-2"></i>
+      <h1 class="text-xl font-bold">本草智管平台</h1>
+    </div>
+    <div class="flex items-center">
+      <span id="welcome-message" class="mr-4"></span>
+      <button id="logout-btn" class="text-white hover:text-white/80 transition-colors">
+        <i class="fa fa-sign-out mr-1"></i> 退出
+      </button>
+    </div>
+  </header>
+
+  <div class="flex flex-1 overflow-hidden">
+    <!-- 侧边栏 -->
+    <aside id="sidebar" class="w-64 bg-gray-50 border-r border-gray-200 transform -translate-x-full md:translate-x-0 fixed md:relative h-full transition-transform duration-300 ease-in-out z-30">
+      <div class="p-4">
+        <div class="flex items-center mb-6">
+          <div class="w-10 h-10 rounded-full bg-primary/20 flex items-center justify-center text-primary">
+            <i class="fa fa-user"></i>
+          </div>
+          <div class="ml-3">
+            <p id="sidebar-username" class="font-medium text-gray-800"></p>
+            <p id="sidebar-role" class="text-xs text-gray-500">管理员</p>
+          </div>
+        </div>
+        <nav class="space-y-1" id="sidebar-nav">
+          <a href="dashboard.html" class="group flex items-center px-2 py-2 text-sm font-medium text-gray-700 rounded-md hover:bg-gray-100" data-role="admin,doctor,patient">
+            <i class="fa fa-dashboard w-6 text-center"></i>
+            <span class="ml-3">控制面板</span>
+          </a>
+          <a href="herbs.html" class="group flex items-center px-2 py-2 text-sm font-medium text-gray-700 rounded-md hover:bg-gray-100" data-role="admin,doctor,patient">
+            <i class="fa fa-pagelines w-6 text-center"></i>
+            <span class="ml-3">药材管理</span>
+          </a>
+          <a href="logs.html" class="group flex items-center px-2 py-2 text-sm font-medium text-gray-700 rounded-md hover:bg-gray-100" data-role="admin">
+            <i class="fa fa-history w-6 text-center"></i>
+            <span class="ml-3">操作日志</span>
+          </a>
+          <a href="users.html" class="sidebar-item-active group flex items-center px-2 py-2 text-sm font-medium rounded-md" data-role="admin">
+            <i class="fa fa-users w-6 text-center"></i>
+            <span class="ml-3">用户管理</span>
+          </a>
+        </nav>
+      </div>
+    </aside>
+
+    <!-- 主内容区 -->
+    <main class="flex-1 overflow-auto p-6">
+      <div class="space-y-6">
+        <div class="flex justify-between items-center">
+          <h2 class="text-2xl font-bold text-gray-800">用户管理</h2>
+          <button id="add-user-btn" class="bg-primary text-white px-4 py-2 rounded-lg font-medium hover:bg-green-700 transition-colors flex items-center">
+            <i class="fa fa-plus mr-2"></i> 添加用户
+          </button>
+        </div>
+
+        <div class="bg-white rounded-xl p-6 shadow-md">
+          <div class="flex flex-col md:flex-row md:items-center justify-between mb-6">
+            <div class="flex w-full md:w-auto gap-2">
+              <input type="text" id="search-input" class="w-full md:w-48 px-4 py-2 rounded-lg border border-gray-300 focus:outline-none focus:border-primary focus:ring-2 focus:ring-primary/20" placeholder="搜索用户名/姓名">
+              <select id="role-filter" class="px-4 py-2 rounded-lg border border-gray-300 focus:outline-none focus:border-primary focus:ring-2 focus:ring-primary/20">
+                <option value="">全部角色</option>
+                <option value="admin">管理员</option>
+                <option value="doctor">医生</option>
+                <option value="patient">病人</option>
+              </select>
+              <button id="search-btn" class="bg-primary text-white px-4 py-2 rounded-lg font-medium hover:bg-green-700 transition-colors">
+                <i class="fa fa-search"></i>
+              </button>
+            </div>
+          </div>
+
+          <div id="user-empty-state" class="flex flex-col items-center justify-center py-12 hidden">
+            <div class="w-16 h-16 bg-yellow-100 rounded-full flex items-center justify-center text-yellow-500 mb-4">
+              <i class="fa fa-exclamation-triangle text-2xl"></i>
+            </div>
+            <h3 class="text-lg font-medium text-gray-900 mb-2">暂无用户数据</h3>
+            <p class="text-gray-500 mb-6">点击"添加用户"按钮开始管理用户</p>
+          </div>
+
+          <div id="user-table-container" class="overflow-x-auto hidden">
+            <table class="min-w-full divide-y divide-gray-200">
+              <thead class="bg-gray-50">
+                <tr>
+                  <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">用户名</th>
+                  <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">真实姓名</th>
+                  <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">角色</th>
+                  <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">联系电话</th>
+                  <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">状态</th>
+                  <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">注册时间</th>
+                  <th class="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">操作</th>
+                </tr>
+              </thead>
+              <tbody id="user-table-body" class="bg-white divide-y divide-gray-200"></tbody>
+            </table>
+          </div>
+        </div>
+      </div>
+    </main>
+  </div>
+
+  <!-- 添加/编辑用户模态框 -->
+  <div id="add-user-modal" class="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 hidden">
+    <div class="bg-white rounded-xl p-6 w-full max-w-2xl mx-4 max-h-[90vh] overflow-y-auto">
+      <div class="flex justify-between items-center mb-4">
+        <h3 class="text-xl font-bold text-gray-800" id="user-modal-title">添加用户</h3>
+        <button id="close-user-modal-btn" class="text-gray-400 hover:text-gray-600">
+          <i class="fa fa-times text-xl"></i>
+        </button>
+      </div>
+
+      <form id="add-user-form" class="space-y-4">
+        <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+          <div>
+            <label class="block text-sm font-medium text-gray-700 mb-1">用户名 <span class="text-red-500">*</span></label>
+            <input type="text" id="user-username" class="w-full px-4 py-2 rounded-lg border border-gray-300 focus:outline-none focus:border-primary focus:ring-2 focus:ring-primary/20" placeholder="请输入用户名">
+          </div>
+          <div>
+            <label class="block text-sm font-medium text-gray-700 mb-1">密码 <span class="text-red-500">*</span></label>
+            <input type="password" id="user-password" class="w-full px-4 py-2 rounded-lg border border-gray-300 focus:outline-none focus:border-primary focus:ring-2 focus:ring-primary/20" placeholder="请输入密码">
+          </div>
+          <div>
+            <label class="block text-sm font-medium text-gray-700 mb-1">真实姓名 <span class="text-red-500">*</span></label>
+            <input type="text" id="user-name" class="w-full px-4 py-2 rounded-lg border border-gray-300 focus:outline-none focus:border-primary focus:ring-2 focus:ring-primary/20" placeholder="请输入真实姓名">
+          </div>
+          <div>
+            <label class="block text-sm font-medium text-gray-700 mb-1">角色 <span class="text-red-500">*</span></label>
+            <select id="user-role" class="w-full px-4 py-2 rounded-lg border border-gray-300 focus:outline-none focus:border-primary focus:ring-2 focus:ring-primary/20">
+              <option value="">请选择角色</option>
+              <option value="admin">管理员</option>
+              <option value="doctor">医生</option>
+              <option value="patient">病人</option>
+            </select>
+          </div>
+          <div>
+            <label class="block text-sm font-medium text-gray-700 mb-1">联系电话</label>
+            <input type="text" id="user-phone" class="w-full px-4 py-2 rounded-lg border border-gray-300 focus:outline-none focus:border-primary focus:ring-2 focus:ring-primary/20" placeholder="请输入联系电话">
+          </div>
+          <div>
+            <label class="block text-sm font-medium text-gray-700 mb-1">账号状态</label>
+            <select id="user-status" class="w-full px-4 py-2 rounded-lg border border-gray-300 focus:outline-none focus:border-primary focus:ring-2 focus:ring-primary/20">
+              <option value="active">活跃</option>
+              <option value="inactive">禁用</option>
+            </select>
+          </div>
+        </div>
+
+        <!-- 医生专属字段 -->
+        <div id="user-doctor-fields" class="hidden grid grid-cols-1 md:grid-cols-2 gap-4">
+          <div>
+            <label class="block text-sm font-medium text-gray-700 mb-1">所属科室</label>
+            <input type="text" id="user-department" class="w-full px-4 py-2 rounded-lg border border-gray-300 focus:outline-none focus:border-primary focus:ring-2 focus:ring-primary/20" placeholder="请输入所属科室">
+          </div>
+          <div>
+            <label class="block text-sm font-medium text-gray-700 mb-1">执业医师证号</label>
+            <input type="text" id="user-license" class="w-full px-4 py-2 rounded-lg border border-gray-300 focus:outline-none focus:border-primary focus:ring-2 focus:ring-primary/20" placeholder="请输入执业证号">
+          </div>
+        </div>
+
+        <!-- 病人专属字段 -->
+        <div id="user-patient-fields" class="hidden grid grid-cols-1 md:grid-cols-2 gap-4">
+          <div>
+            <label class="block text-sm font-medium text-gray-700 mb-1">性别</label>
+            <select id="user-gender" class="w-full px-4 py-2 rounded-lg border border-gray-300 focus:outline-none focus:border-primary focus:ring-2 focus:ring-primary/20">
+              <option value="">请选择</option>
+              <option value="男">男</option>
+              <option value="女">女</option>
+            </select>
+          </div>
+          <div>
+            <label class="block text-sm font-medium text-gray-700 mb-1">年龄</label>
+            <input type="number" id="user-age" class="w-full px-4 py-2 rounded-lg border border-gray-300 focus:outline-none focus:border-primary focus:ring-2 focus:ring-primary/20" placeholder="请输入年龄" min="0">
+          </div>
+        </div>
+
+        <div class="flex justify-end space-x-4 pt-2">
+          <button type="button" id="cancel-add-user" class="px-6 py-2 border border-gray-300 rounded-lg font-medium hover:bg-gray-50 transition-colors">
+            取消
+          </button>
+          <button type="submit" class="px-6 py-2 bg-primary text-white rounded-lg font-medium hover:bg-green-700 transition-colors">
+            <i class="fa fa-save mr-1"></i> 保存
+          </button>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <!-- 删除确认模态框 -->
+  <div id="delete-user-modal" class="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 hidden">
+    <div class="bg-white rounded-xl p-6 w-full max-w-md mx-4">
+      <div class="text-center mb-4">
+        <div class="w-16 h-16 bg-red-100 rounded-full flex items-center justify-center text-red-500 mb-4 mx-auto">
+          <i class="fa fa-exclamation-triangle text-2xl"></i>
+        </div>
+        <h3 class="text-xl font-bold text-gray-800 mb-2">确认删除</h3>
+        <p class="text-gray-600" id="delete-user-message">您确定要删除此用户吗？此操作不可撤销。</p>
+      </div>
+      <div class="flex justify-center space-x-4">
+        <button id="cancel-delete-user" class="px-6 py-2 border border-gray-300 rounded-lg font-medium hover:bg-gray-50 transition-colors">
+          取消
+        </button>
+        <button id="confirm-delete-user" class="px-6 py-2 bg-red-600 text-white rounded-lg font-medium hover:bg-red-700 transition-colors">
+          <i class="fa fa-trash mr-1"></i> 删除
+        </button>
+      </div>
+    </div>
+  </div>
+
+  <script>
+    // ===== 后端 API 辅助层 =====
+    const API_BASE = '';
+    async function api(method, url, body) {
+      const opts = { method: method, headers: { 'Content-Type': 'application/json', 'X-User': sessionStorage.getItem('current_user') || '' } };
+      if (body !== undefined) opts.body = JSON.stringify(body);
+      const resp = await fetch(API_BASE + url, opts);
+      const result = await resp.json().catch(() => ({ code: -1, message: '服务器连接失败' }));
+      if (result.code !== 0) {
+        alert(result.message);
+        throw new Error(result.message);
+      }
+      return result.data;
+    }
+
+    document.addEventListener('DOMContentLoaded', () => {
+      // 侧边栏切换
+      document.getElementById('sidebar-toggle').addEventListener('click', () => {
+        document.getElementById('sidebar').classList.toggle('-translate-x-full');
+      });
+
+      // 检查登录状态 & 权限
+      const currentUser = sessionStorage.getItem('current_user');
+      const currentRole = sessionStorage.getItem('current_role');
+      const currentName = sessionStorage.getItem('current_name') || currentUser;
+      if (!currentUser) window.location.href = 'index.html';
+      if (currentRole !== 'admin') {
+        alert('您没有权限访问用户管理页面');
+        window.location.href = 'dashboard.html';
+      }
+
+      const roleText = { admin: '管理员', doctor: '医生', patient: '病人' };
+      document.getElementById('welcome-message').textContent = `欢迎，${currentName}`;
+      document.getElementById('sidebar-username').textContent = currentName;
+      document.getElementById('sidebar-role').textContent = roleText[currentRole] || '用户';
+
+      // 角色菜单权限控制
+      document.querySelectorAll('#sidebar-nav > a').forEach(item => {
+        const allowedRoles = item.dataset.role.split(',');
+        if (!allowedRoles.includes(currentRole)) {
+          item.classList.add('hidden');
+        }
+      });
+
+      // DOM 元素
+      const addUserBtn = document.getElementById('add-user-btn');
+      const addUserModal = document.getElementById('add-user-modal');
+      const closeUserModalBtn = document.getElementById('close-user-modal-btn');
+      const cancelAddUser = document.getElementById('cancel-add-user');
+      const addUserForm = document.getElementById('add-user-form');
+      const userEmptyState = document.getElementById('user-empty-state');
+      const userTableContainer = document.getElementById('user-table-container');
+      const userTableBody = document.getElementById('user-table-body');
+      const deleteUserModal = document.getElementById('delete-user-modal');
+      const cancelDeleteUser = document.getElementById('cancel-delete-user');
+      const confirmDeleteUser = document.getElementById('confirm-delete-user');
+      const deleteUserMessage = document.getElementById('delete-user-message');
+      const searchInput = document.getElementById('search-input');
+      const roleFilter = document.getElementById('role-filter');
+      const searchBtn = document.getElementById('search-btn');
+      const userRoleSelect = document.getElementById('user-role');
+
+      const USERS_KEY = 'herb_management_system_users';
+      let currentUserId = null;
+      let currentFilter = { keyword: '', role: '' };
+      let USERS_CACHE = [];
+
+      const getUsers = async () => {
+        const params = new URLSearchParams();
+        if (currentFilter.keyword) params.set('keyword', currentFilter.keyword);
+        if (currentFilter.role) params.set('role', currentFilter.role);
+        USERS_CACHE = await api('GET', '/api/users?' + params.toString());
+        return USERS_CACHE;
+      };
+
+      // 角色切换显示专属字段
+      userRoleSelect.addEventListener('change', () => {
+        const role = userRoleSelect.value;
+        document.getElementById('user-doctor-fields').classList.toggle('hidden', role !== 'doctor');
+        document.getElementById('user-patient-fields').classList.toggle('hidden', role !== 'patient');
+      });
+
+      // 渲染用户表格
+      const renderUserTable = async () => {
+        let users = await getUsers();
+
+        userTableBody.innerHTML = '';
+
+        if (users.length === 0) {
+          userEmptyState.classList.remove('hidden');
+          userTableContainer.classList.add('hidden');
+          return;
+        }
+
+        userEmptyState.classList.add('hidden');
+        userTableContainer.classList.remove('hidden');
+
+        users.forEach(user => {
+          const roleClass = user.role === 'admin' ? 'bg-purple-100 text-purple-800' :
+                            user.role === 'doctor' ? 'bg-blue-100 text-blue-800' :
+                            'bg-green-100 text-green-800';
+          const statusClass = user.status === 'active' ? 'bg-green-100 text-green-800' : 'bg-red-100 text-red-800';
+          const statusText = user.status === 'active' ? '活跃' : '禁用';
+          const isCurrentUser = user.username === currentUser;
+
+          const row = document.createElement('tr');
+          row.className = 'hover:bg-gray-50';
+          row.innerHTML = `
+            <td class="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">${user.username}${isCurrentUser ? ' <span class="text-xs text-primary">(当前)</span>' : ''}</td>
+            <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-900">${user.name || '-'}</td>
+            <td class="px-6 py-4 whitespace-nowrap">
+              <span class="px-2 inline-flex text-xs leading-5 font-semibold rounded-full ${roleClass}">${roleText[user.role] || user.role}</span>
+            </td>
+            <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-900">${user.phone || '-'}</td>
+            <td class="px-6 py-4 whitespace-nowrap">
+              <span class="px-2 inline-flex text-xs leading-5 font-semibold rounded-full ${statusClass}">${statusText}</span>
+            </td>
+            <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">${user.createTime || '-'}</td>
+            <td class="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
+              <button class="text-blue-600 hover:text-blue-900 mr-3 edit-user-btn" data-id="${user.username}">编辑</button>
+              <button class="text-red-600 hover:text-red-900 delete-user-btn" data-id="${user.username}" ${isCurrentUser ? 'disabled style="opacity:0.4;cursor:not-allowed;"' : ''}>删除</button>
+            </td>
+          `;
+          userTableBody.appendChild(row);
+        });
+      };
+
+      const closeModal = () => {
+        addUserModal.classList.add('hidden');
+        deleteUserModal.classList.add('hidden');
+        addUserForm.reset();
+        addUserForm.removeAttribute('data-editing-id');
+        document.getElementById('user-doctor-fields').classList.add('hidden');
+        document.getElementById('user-patient-fields').classList.add('hidden');
+      };
+
+      // 添加用户
+      addUserBtn.addEventListener('click', () => {
+        document.getElementById('user-modal-title').textContent = '添加用户';
+        document.getElementById('user-username').disabled = false;
+        addUserModal.classList.remove('hidden');
+      });
+
+      // 编辑/删除事件委托
+      userTableBody.addEventListener('click', async (e) => {
+        const editBtn = e.target.closest('.edit-user-btn');
+        const deleteBtn = e.target.closest('.delete-user-btn');
+
+        if (editBtn) {
+          const userId = editBtn.getAttribute('data-id');
+          const users = await getUsers();
+          const user = users.find(u => u.username === userId);
+          if (!user) return;
+
+          document.getElementById('user-modal-title').textContent = '编辑用户';
+          document.getElementById('user-username').value = user.username;
+          document.getElementById('user-username').disabled = true;
+          document.getElementById('user-password').value = '';
+          document.getElementById('user-password').placeholder = '不修改请留空';
+          document.getElementById('user-name').value = user.name || '';
+          document.getElementById('user-role').value = user.role;
+          document.getElementById('user-phone').value = user.phone || '';
+          document.getElementById('user-status').value = user.status || 'active';
+          document.getElementById('user-department').value = user.department || '';
+          document.getElementById('user-license').value = user.license || '';
+          document.getElementById('user-gender').value = user.gender || '';
+          document.getElementById('user-age').value = user.age || '';
+
+          if (user.role === 'doctor') document.getElementById('user-doctor-fields').classList.remove('hidden');
+          if (user.role === 'patient') document.getElementById('user-patient-fields').classList.remove('hidden');
+
+          addUserForm.setAttribute('data-editing-id', userId);
+          addUserModal.classList.remove('hidden');
+        }
+
+        if (deleteBtn && !deleteBtn.disabled) {
+          const userId = deleteBtn.getAttribute('data-id');
+          if (userId === currentUser) return;
+          const users = await getUsers();
+          const user = users.find(u => u.username === userId);
+          if (!user) return;
+
+          currentUserId = userId;
+          deleteUserMessage.textContent = `您确定要删除用户 "${userId}"（${user.name || ''}）吗？此操作不可撤销。`;
+          deleteUserModal.classList.remove('hidden');
+        }
+      });
+
+      // 表单提交
+      addUserForm.addEventListener('submit', async (e) => {
+        e.preventDefault();
+
+        const username = document.getElementById('user-username').value.trim();
+        const password = document.getElementById('user-password').value;
+        const name = document.getElementById('user-name').value.trim();
+        const role = document.getElementById('user-role').value;
+        const phone = document.getElementById('user-phone').value.trim();
+        const status = document.getElementById('user-status').value;
+
+        const editingId = addUserForm.getAttribute('data-editing-id');
+
+        if (!username || !name || !role) {
+          alert('请填写所有必填字段');
+          return;
+        }
+        if (!editingId && !password) {
+          alert('请填写密码');
+          return;
+        }
+
+        const userData = {
+          password,
+          name,
+          role,
+          phone,
+          status
+        };
+
+        if (role === 'doctor') {
+          userData.department = document.getElementById('user-department').value.trim();
+          userData.license = document.getElementById('user-license').value.trim();
+        }
+        if (role === 'patient') {
+          userData.gender = document.getElementById('user-gender').value;
+          userData.age = document.getElementById('user-age').value;
+        }
+
+        try {
+          if (editingId) {
+            await api('PUT', '/api/users/' + encodeURIComponent(editingId), userData);
+            alert('用户更新成功！');
+          } else {
+            await api('POST', '/api/users', userData);
+            alert('用户添加成功！');
+          }
+          closeModal();
+          await renderUserTable();
+        } catch (err) {
+          alert(err.message || '保存失败');
+        }
+      });
+
+      // 确认删除
+      confirmDeleteUser.addEventListener('click', async () => {
+        if (currentUserId && currentUserId !== currentUser) {
+          try {
+            await api('DELETE', '/api/users/' + encodeURIComponent(currentUserId));
+            currentUserId = null;
+            closeModal();
+            await renderUserTable();
+            alert('用户删除成功！');
+          } catch (e) {
+            alert(e.message || '删除失败');
+          }
+        }
+      });
+
+      // 搜索
+      searchBtn.addEventListener('click', () => {
+        currentFilter.keyword = searchInput.value.trim();
+        currentFilter.role = roleFilter.value;
+        renderUserTable();
+      });
+      searchInput.addEventListener('keypress', (e) => {
+        if (e.key === 'Enter') {
+          currentFilter.keyword = searchInput.value.trim();
+          currentFilter.role = roleFilter.value;
+          renderUserTable();
+        }
+      });
+      roleFilter.addEventListener('change', () => {
+        currentFilter.keyword = searchInput.value.trim();
+        currentFilter.role = roleFilter.value;
+        renderUserTable();
+      });
+
+      // 退出登录
+      document.getElementById('logout-btn').addEventListener('click', () => {
+        sessionStorage.removeItem('current_user');
+        sessionStorage.removeItem('current_role');
+        sessionStorage.removeItem('current_name');
+        window.location.href = 'index.html';
+      });
+
+      // 关闭模态框
+      closeUserModalBtn.addEventListener('click', closeModal);
+      cancelAddUser.addEventListener('click', closeModal);
+      cancelDeleteUser.addEventListener('click', closeModal);
+      [addUserModal, deleteUserModal].forEach(modal => {
+        modal.addEventListener('click', (e) => {
+          if (e.target === modal) closeModal();
+        });
+      });
+
+      // 初始化
+      renderUserTable();
+    });
+  </script>
+</body>
+</html>

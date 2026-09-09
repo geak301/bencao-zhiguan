@@ -1,0 +1,736 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>控制面板 - 本草智管平台</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <link href="https://cdn.jsdelivr.net/npm/font-awesome@4.7.0/css/font-awesome.min.css" rel="stylesheet">
+  <script>
+    tailwind.config = {
+      theme: {
+        extend: {
+          colors: {
+            primary: '#2E7D32',
+            secondary: '#8D6E63',
+            accent: '#D32F2F',
+            neutral: '#F5F5F5',
+          }
+        }
+      }
+    }
+  </script>
+  <style>
+    .sidebar-item-active {
+      background-color: rgba(46,125,50,0.1);
+      color: #2E7D32;
+      border-left: 4px solid #2E7D32;
+    }
+    .stat-card { transition: transform 0.2s, box-shadow 0.2s; }
+    .stat-card:hover { transform: translateY(-2px); box-shadow: 0 10px 20px rgba(0,0,0,0.08); }
+    .herb-tag {
+      display: inline-block; padding: 4px 12px; margin: 3px;
+      background: #e8f5e9; color: #2E7D32; border-radius: 12px;
+      font-size: 13px; cursor: pointer; transition: all 0.2s;
+      border: 1px solid transparent;
+    }
+    .herb-tag:hover { background: #c8e6c9; border-color: #2E7D32; transform: scale(1.05); }
+    .herb-tag.low-stock { background: #fff3cd; color: #856404; }
+    .herb-tag.low-stock:hover { background: #ffe69c; }
+    .bar-chart-bar {
+      transition: height 0.5s ease, background 0.3s;
+      cursor: pointer;
+    }
+    .bar-chart-bar:hover { filter: brightness(1.1); transform: scaleY(1.02); transform-origin: bottom; }
+    /* 图表切换动画 */
+    .chart-container { position: relative; height: 200px; }
+    .chart-panel {
+      position: absolute; top: 0; left: 0; right: 0; bottom: 0;
+      transition: opacity 0.4s ease, transform 0.4s ease;
+    }
+    .chart-panel.hidden-panel {
+      opacity: 0;
+      transform: scale(0.95) translateY(10px);
+      pointer-events: none;
+    }
+    .chart-panel.visible-panel {
+      opacity: 1;
+      transform: scale(1) translateY(0);
+      pointer-events: auto;
+    }
+    /* 趋势图动画 */
+    .trend-line {
+      stroke-dasharray: 1000;
+      stroke-dashoffset: 1000;
+      animation: drawLine 1.5s ease forwards;
+    }
+    .trend-dot {
+      opacity: 0;
+      animation: fadeInDot 0.3s ease forwards;
+    }
+    @keyframes drawLine { to { stroke-dashoffset: 0; } }
+    @keyframes fadeInDot { to { opacity: 1; } }
+    .log-timeline { position: relative; padding-left: 28px; }
+    .log-timeline::before {
+      content: ''; position: absolute; left: 9px; top: 0; bottom: 0;
+      width: 2px; background: linear-gradient(to bottom, #2E7D32, #e0e0e0);
+    }
+    .log-item { position: relative; margin-bottom: 16px; }
+    .log-item::before {
+      content: ''; position: absolute; left: -23px; top: 6px;
+      width: 12px; height: 12px; border-radius: 50%;
+      border: 2px solid white; box-shadow: 0 0 0 2px currentColor;
+    }
+    .log-item.action-add::before { color: #2E7D32; background: #2E7D32; }
+    .log-item.action-edit::before { color: #1976D2; background: #1976D2; }
+    .log-item.action-delete::before { color: #D32F2F; background: #D32F2F; }
+    .log-change { font-size: 13px; color: #555; margin-top: 4px; padding: 4px 8px; background: #f9f9f9; border-radius: 4px; }
+    .log-change .old { color: #D32F2F; text-decoration: line-through; }
+    .log-change .new { color: #2E7D32; font-weight: 600; }
+    .modal-scroll { max-height: 70vh; overflow-y: auto; }
+    .back-btn {
+      display: inline-flex; align-items: center; gap: 4px;
+      padding: 4px 12px; border-radius: 6px; font-size: 12px;
+      background: #f0f0f0; color: #555; cursor: pointer; transition: all 0.2s;
+      border: none;
+    }
+    .back-btn:hover { background: #e0e0e0; color: #333; }
+  </style>
+</head>
+<body class="bg-neutral min-h-screen flex flex-col">
+  <header class="bg-primary text-white py-4 px-6 flex items-center justify-between shadow-lg">
+    <div class="flex items-center">
+      <button id="sidebar-toggle" class="mr-4 md:hidden"><i class="fa fa-bars text-xl"></i></button>
+      <i class="fa fa-leaf mr-2"></i>
+      <h1 class="text-xl font-bold">本草智管平台</h1>
+    </div>
+    <div class="flex items-center">
+      <span id="welcome-message" class="mr-4"></span>
+      <button id="logout-btn" class="text-white hover:text-white/80 transition-colors">
+        <i class="fa fa-sign-out mr-1"></i> 退出
+      </button>
+    </div>
+  </header>
+
+  <div class="flex flex-1 overflow-hidden">
+    <aside id="sidebar" class="w-64 bg-gray-50 border-r border-gray-200 transform -translate-x-full md:translate-x-0 fixed md:relative h-full transition-transform duration-300 ease-in-out z-30">
+      <div class="p-4">
+        <div class="flex items-center mb-6">
+          <div class="w-10 h-10 rounded-full bg-primary/20 flex items-center justify-center text-primary"><i class="fa fa-user"></i></div>
+          <div class="ml-3">
+            <p id="sidebar-username" class="font-medium text-gray-800"></p>
+            <p id="sidebar-role" class="text-xs text-gray-500">管理员</p>
+          </div>
+        </div>
+        <nav class="space-y-1" id="sidebar-nav">
+          <a href="dashboard.html" class="sidebar-item-active group flex items-center px-2 py-2 text-sm font-medium rounded-md" data-role="admin,doctor,patient">
+            <i class="fa fa-dashboard w-6 text-center"></i><span class="ml-3">控制面板</span>
+          </a>
+          <a href="herbs.html" class="group flex items-center px-2 py-2 text-sm font-medium text-gray-700 rounded-md hover:bg-gray-100" data-role="admin,doctor,patient">
+            <i class="fa fa-pagelines w-6 text-center"></i><span class="ml-3">药材管理</span>
+          </a>
+          <a href="logs.html" class="group flex items-center px-2 py-2 text-sm font-medium text-gray-700 rounded-md hover:bg-gray-100" data-role="admin">
+            <i class="fa fa-history w-6 text-center"></i><span class="ml-3">操作日志</span>
+          </a>
+          <a href="users.html" class="group flex items-center px-2 py-2 text-sm font-medium text-gray-700 rounded-md hover:bg-gray-100" data-role="admin">
+            <i class="fa fa-users w-6 text-center"></i><span class="ml-3">用户管理</span>
+          </a>
+        </nav>
+      </div>
+    </aside>
+
+    <main class="flex-1 overflow-auto p-6">
+      <div class="space-y-6">
+        <div>
+          <h2 class="text-2xl font-bold text-gray-800">控制面板</h2>
+          <p class="text-gray-500 mt-1" id="dashboard-subtitle">欢迎使用本草智管平台</p>
+        </div>
+
+        <!-- 统计卡片 -->
+        <div class="grid grid-cols-1 md:grid-cols-3 gap-6">
+          <!-- 药材总数（常驻显示） -->
+          <div class="stat-card bg-white rounded-xl p-6 shadow-md md:col-span-1">
+            <div class="flex items-center justify-between mb-3">
+              <div>
+                <p class="text-sm text-gray-500">药材总数</p>
+                <p class="text-3xl font-bold text-gray-800 mt-1" id="stat-herb-count">0</p>
+              </div>
+              <div class="w-12 h-12 bg-green-100 rounded-full flex items-center justify-center text-green-600">
+                <i class="fa fa-pagelines text-xl"></i>
+              </div>
+            </div>
+            <div class="border-t pt-3">
+              <p class="text-xs text-gray-400 mb-2">全部药材（点击查看操作日志）：</p>
+              <div id="herb-names-list" class="max-h-48 overflow-y-auto"></div>
+            </div>
+          </div>
+
+          <!-- 总库存量（柱状图 + 趋势图切换） -->
+          <div class="stat-card bg-white rounded-xl p-6 shadow-md md:col-span-2" id="stock-chart-card">
+            <div class="flex items-center justify-between mb-2">
+              <div>
+                <p class="text-sm text-gray-500">总库存量</p>
+                <p class="text-2xl font-bold text-gray-800 mt-1">
+                  <span id="stat-total-quantity">0</span>
+                  <span class="text-sm font-normal text-gray-400" id="stat-unit-label">单位</span>
+                </p>
+              </div>
+              <div class="flex items-center gap-2">
+                <button id="back-to-bar-chart" class="back-btn hidden">
+                  <i class="fa fa-arrow-left"></i> 返回总览
+                </button>
+                <div class="w-10 h-10 bg-blue-100 rounded-full flex items-center justify-center text-blue-600">
+                  <i class="fa fa-cubes text-lg"></i>
+                </div>
+              </div>
+            </div>
+            <p class="text-xs text-gray-400 mb-2" id="chart-title">各药材库存量分布（点击柱子查看趋势）</p>
+            <div class="chart-container">
+              <!-- 柱状图面板 -->
+              <div id="bar-chart-panel" class="chart-panel visible-panel">
+                <div id="stock-bar-chart" class="flex items-end justify-around h-36 border-b border-l border-gray-200 pl-2 pb-1 gap-1"></div>
+                <div id="stock-chart-labels" class="flex justify-around mt-1 gap-1"></div>
+              </div>
+              <!-- 趋势图面板 -->
+              <div id="trend-chart-panel" class="chart-panel hidden-panel">
+                <svg id="trend-svg" width="100%" height="160" viewBox="0 0 600 160" preserveAspectRatio="none"></svg>
+                <div id="trend-chart-labels" class="flex justify-between mt-1 px-2 text-xs text-gray-400"></div>
+              </div>
+            </div>
+            <p class="text-xs text-gray-400 mt-1 text-center" id="stock-chart-hint">橙色柱表示库存不足</p>
+          </div>
+        </div>
+
+        <!-- 库存预警 & 快捷操作 -->
+        <div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
+          <div class="bg-white rounded-xl p-6 shadow-md">
+            <div class="flex items-center justify-between mb-4">
+              <h3 class="text-lg font-bold text-gray-800">库存预警</h3>
+              <span class="px-3 py-1 bg-red-100 text-red-600 rounded-full text-sm font-medium" id="stat-low-stock-badge">0 种</span>
+            </div>
+            <div id="low-stock-list" class="space-y-3">
+              <p class="text-gray-400 text-center py-8">暂无库存预警</p>
+            </div>
+          </div>
+
+          <div class="bg-white rounded-xl p-6 shadow-md">
+            <h3 class="text-lg font-bold text-gray-800 mb-4">快捷操作</h3>
+            <div class="grid grid-cols-2 gap-4" id="quick-actions">
+              <a href="herbs.html" class="flex flex-col items-center justify-center p-4 bg-green-50 rounded-lg hover:bg-green-100 transition-colors">
+                <i class="fa fa-plus-circle text-3xl text-green-600 mb-2"></i>
+                <span class="text-sm font-medium text-gray-700">添加药材</span>
+              </a>
+              <a href="herbs.html" class="flex flex-col items-center justify-center p-4 bg-yellow-50 rounded-lg hover:bg-yellow-100 transition-colors">
+                <i class="fa fa-search text-3xl text-yellow-600 mb-2"></i>
+                <span class="text-sm font-medium text-gray-700">查询药材</span>
+              </a>
+              <a href="logs.html" class="flex flex-col items-center justify-center p-4 bg-indigo-50 rounded-lg hover:bg-indigo-100 transition-colors" id="quick-logs">
+                <i class="fa fa-history text-3xl text-indigo-600 mb-2"></i>
+                <span class="text-sm font-medium text-gray-700">操作日志</span>
+              </a>
+              <a href="users.html" class="flex flex-col items-center justify-center p-4 bg-purple-50 rounded-lg hover:bg-purple-100 transition-colors" id="quick-user-mgmt">
+                <i class="fa fa-users text-3xl text-purple-600 mb-2"></i>
+                <span class="text-sm font-medium text-gray-700">用户管理</span>
+              </a>
+            </div>
+          </div>
+        </div>
+      </div>
+    </main>
+  </div>
+
+  <!-- 库存预警弹窗 -->
+  <div id="stock-warning-modal" class="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 hidden">
+    <div class="bg-white rounded-xl p-6 w-full max-w-lg mx-4">
+      <div class="text-center mb-4">
+        <div class="w-16 h-16 bg-yellow-100 rounded-full flex items-center justify-center text-yellow-500 mb-4 mx-auto animate-pulse">
+          <i class="fa fa-exclamation-triangle text-3xl"></i>
+        </div>
+        <h3 class="text-xl font-bold text-gray-800 mb-2">库存预警提醒</h3>
+        <p class="text-gray-600" id="warning-summary">以下药材库存已低于预警阈值，请及时补货：</p>
+      </div>
+      <div id="warning-herb-list" class="space-y-2 max-h-64 overflow-y-auto mb-4"></div>
+      <div class="flex justify-center space-x-4">
+        <button id="warning-goto-herbs" class="px-6 py-2 bg-primary text-white rounded-lg font-medium hover:bg-green-700 transition-colors">
+          <i class="fa fa-arrow-right mr-1"></i> 前往补货
+        </button>
+        <button id="warning-close" class="px-6 py-2 border border-gray-300 rounded-lg font-medium hover:bg-gray-50 transition-colors">
+          知道了
+        </button>
+      </div>
+    </div>
+  </div>
+
+  <!-- 药材操作日志模态框 -->
+  <div id="herb-log-modal" class="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 hidden">
+    <div class="bg-white rounded-xl p-6 w-full max-w-2xl mx-4">
+      <div class="flex justify-between items-center mb-4">
+        <div>
+          <h3 class="text-xl font-bold text-gray-800" id="log-modal-title">药材操作日志</h3>
+          <p class="text-sm text-gray-500 mt-1">日志最长保留1年，超期自动清理</p>
+        </div>
+        <button id="log-modal-close" class="text-gray-400 hover:text-gray-600"><i class="fa fa-times text-xl"></i></button>
+      </div>
+      <div class="modal-scroll" id="log-timeline-container"></div>
+    </div>
+  </div>
+
+  <script>
+    // ===== 后端 API 辅助层 =====
+    const API_BASE = '';
+    async function api(method, url, body) {
+      const opts = { method: method, headers: { 'Content-Type': 'application/json', 'X-User': sessionStorage.getItem('current_user') || '' } };
+      if (body !== undefined) opts.body = JSON.stringify(body);
+      const resp = await fetch(API_BASE + url, opts);
+      const result = await resp.json().catch(() => ({ code: -1, message: '服务器连接失败' }));
+      if (result.code !== 0) {
+        alert(result.message);
+        throw new Error(result.message);
+      }
+      return result.data;
+    }
+
+    const LOGS_KEY = 'herb_operation_logs';
+    const LOG_RETENTION_DAYS = 365;
+    const DEFAULT_WARNING_THRESHOLD = 200;
+    const ACTION_TEXT = { add: '新增药材', edit: '编辑药材', delete: '删除药材' };
+
+    // 日志与药材统一缓存（由后端 /api/dashboard 一次性加载）
+    let ALL_LOGS = [];
+    let ALL_HERBS = [];
+
+    function getLogs() { return ALL_LOGS; }
+    function cleanupOldLogs() { return ALL_LOGS; }
+
+    // 从后端加载仪表盘数据
+    async function loadDashboardData() {
+      const data = await api('GET', '/api/dashboard');
+      ALL_HERBS = data.herbs || [];
+      ALL_LOGS = data.logs || [];
+      loadDashboardStats(ALL_HERBS);
+    }
+
+    document.addEventListener('DOMContentLoaded', async () => {
+      try {
+        await loadDashboardData();
+      } catch (e) {
+        alert(e.message || '数据加载失败');
+      }
+
+      document.getElementById('sidebar-toggle').addEventListener('click', () => {
+        document.getElementById('sidebar').classList.toggle('-translate-x-full');
+      });
+
+      const currentUser = sessionStorage.getItem('current_user');
+      const currentRole = sessionStorage.getItem('current_role');
+      const currentName = sessionStorage.getItem('current_name') || currentUser;
+      if (!currentUser) window.location.href = 'index.html';
+
+      const roleText = { admin: '管理员', doctor: '医生', patient: '病人' };
+      document.getElementById('welcome-message').textContent = `欢迎，${currentName}`;
+      document.getElementById('sidebar-username').textContent = currentName;
+      document.getElementById('sidebar-role').textContent = roleText[currentRole] || '用户';
+      document.getElementById('dashboard-subtitle').textContent = `您好，${currentName}！当前身份：${roleText[currentRole] || '用户'}`;
+
+      document.querySelectorAll('#sidebar-nav > a').forEach(item => {
+        const allowedRoles = item.dataset.role.split(',');
+        if (!allowedRoles.includes(currentRole)) item.classList.add('hidden');
+      });
+
+      if (currentRole !== 'admin') {
+        document.getElementById('quick-user-mgmt').classList.add('hidden');
+        document.getElementById('quick-logs').classList.add('hidden');
+      }
+
+      // 库存预警：只在登录时提醒一次
+      if (currentRole === 'admin') {
+        const warningShown = sessionStorage.getItem('stock_warning_shown');
+        if (!warningShown) {
+          const herbs = ALL_HERBS;
+          const lowStockHerbs = herbs.filter(h => {
+            const threshold = h.warningThreshold || DEFAULT_WARNING_THRESHOLD;
+            return h.quantity <= threshold;
+          });
+          if (lowStockHerbs.length > 0) {
+            showStockWarningModal(lowStockHerbs);
+          }
+          sessionStorage.setItem('stock_warning_shown', 'true');
+        }
+      }
+
+      // 预警弹窗按钮
+      document.getElementById('warning-close').addEventListener('click', () => {
+        document.getElementById('stock-warning-modal').classList.add('hidden');
+      });
+      document.getElementById('warning-goto-herbs').addEventListener('click', () => {
+        window.location.href = 'herbs.html';
+      });
+
+      // 日志模态框关闭
+      document.getElementById('log-modal-close').addEventListener('click', () => {
+        document.getElementById('herb-log-modal').classList.add('hidden');
+      });
+      document.getElementById('herb-log-modal').addEventListener('click', (e) => {
+        if (e.target.id === 'herb-log-modal') document.getElementById('herb-log-modal').classList.add('hidden');
+      });
+
+      // 返回总览按钮
+      document.getElementById('back-to-bar-chart').addEventListener('click', () => {
+        switchToBarChart();
+      });
+
+      // 退出登录
+      document.getElementById('logout-btn').addEventListener('click', () => {
+        sessionStorage.removeItem('current_user');
+        sessionStorage.removeItem('current_role');
+        sessionStorage.removeItem('current_name');
+        sessionStorage.removeItem('stock_warning_shown');
+        window.location.href = 'index.html';
+      });
+    });
+
+    // ============== 加载统计数据 ==============
+    function loadDashboardStats(herbs) {
+      const totalQuantity = herbs.reduce((acc, h) => acc + (h.quantity || 0), 0);
+      const lowStock = herbs.filter(h => {
+        const threshold = h.warningThreshold || DEFAULT_WARNING_THRESHOLD;
+        return h.quantity <= threshold;
+      });
+
+      document.getElementById('stat-herb-count').textContent = herbs.length;
+      document.getElementById('stat-total-quantity').textContent = totalQuantity;
+      document.getElementById('stat-low-stock-badge').textContent = lowStock.length + ' 种';
+
+      const unit = herbs.length > 0 ? (herbs[0].unit || '') : '';
+      document.getElementById('stat-unit-label').textContent = unit ? unit : '单位';
+
+      // 渲染药材名称标签（常驻显示）
+      const namesList = document.getElementById('herb-names-list');
+      if (herbs.length === 0) {
+        namesList.innerHTML = '<p class="text-gray-400 text-sm">暂无药材</p>';
+      } else {
+        namesList.innerHTML = herbs.map(h => {
+          const threshold = h.warningThreshold || DEFAULT_WARNING_THRESHOLD;
+          const isLow = h.quantity <= threshold;
+          return `<span class="herb-tag ${isLow ? 'low-stock' : ''}" data-code="${h.code}" data-name="${h.name}" title="点击查看${h.name}的操作日志">
+            ${h.name} <span class="text-xs opacity-60">(${h.quantity}${h.unit || ''})</span>
+          </span>`;
+        }).join('');
+        namesList.querySelectorAll('.herb-tag').forEach(tag => {
+          tag.addEventListener('click', () => {
+            const code = tag.getAttribute('data-code');
+            const name = tag.getAttribute('data-name');
+            showHerbLogModal(code, name);
+          });
+        });
+      }
+
+      // 渲染库存柱状图
+      renderStockBarChart(herbs);
+
+      // 渲染库存预警列表
+      const listEl = document.getElementById('low-stock-list');
+      if (lowStock.length === 0) {
+        listEl.innerHTML = '<p class="text-gray-400 text-center py-8">暂无库存预警</p>';
+      } else {
+        listEl.innerHTML = lowStock.slice(0, 5).map(h => {
+          const threshold = h.warningThreshold || DEFAULT_WARNING_THRESHOLD;
+          return `
+            <div class="flex items-center justify-between p-3 bg-red-50 rounded-lg">
+              <div class="flex items-center">
+                <div class="w-8 h-8 bg-red-100 rounded-full flex items-center justify-center text-red-500 mr-3">
+                  <i class="fa fa-exclamation text-sm"></i>
+                </div>
+                <div>
+                  <p class="text-sm font-medium text-gray-800">${h.name}</p>
+                  <p class="text-xs text-gray-500">${h.category || '未分类'} · 阈值 ${threshold}${h.unit || ''}</p>
+                </div>
+              </div>
+              <span class="text-sm font-bold text-red-600">${h.quantity} ${h.unit || ''}</span>
+            </div>
+          `;
+        }).join('');
+      }
+    }
+
+    // ============== 库存柱状图 ==============
+    function renderStockBarChart(herbs) {
+      const chartContainer = document.getElementById('stock-bar-chart');
+      const labelsContainer = document.getElementById('stock-chart-labels');
+      const hint = document.getElementById('stock-chart-hint');
+
+      if (herbs.length === 0) {
+        chartContainer.innerHTML = '<p class="text-gray-400 text-sm text-center w-full self-center">暂无库存数据</p>';
+        labelsContainer.innerHTML = '';
+        hint.textContent = '添加药材后将显示库存分布';
+        return;
+      }
+
+      const displayHerbs = herbs.slice(0, 8);
+      const maxQty = Math.max(...displayHerbs.map(h => h.quantity || 0), 1);
+      const colors = ['#2E7D32','#388E3C','#43A047','#4CAF50','#66BB6A','#81C784','#A5D6A7','#C8E6C9'];
+
+      chartContainer.innerHTML = displayHerbs.map((h, i) => {
+        const heightPercent = ((h.quantity || 0) / maxQty) * 100;
+        const threshold = h.warningThreshold || DEFAULT_WARNING_THRESHOLD;
+        const isLow = h.quantity <= threshold;
+        const barColor = isLow ? '#FF9800' : colors[i % colors.length];
+        return `
+          <div class="flex flex-col items-center justify-end flex-1 h-full group relative" title="${h.name}: ${h.quantity}${h.unit || ''}${isLow ? ' (库存不足)' : ''}">
+            <span class="text-xs text-gray-600 mb-1 opacity-0 group-hover:opacity-100 transition-opacity">${h.quantity}</span>
+            <div class="bar-chart-bar w-full max-w-[40px] rounded-t-md" data-code="${h.code}" data-name="${h.name}"
+                 style="height: ${heightPercent}%; background: ${barColor}; min-height: 2px;"></div>
+          </div>
+        `;
+      }).join('');
+
+      // 绑定柱子点击事件
+      chartContainer.querySelectorAll('.bar-chart-bar').forEach(bar => {
+        bar.addEventListener('click', () => {
+          const code = bar.getAttribute('data-code');
+          const name = bar.getAttribute('data-name');
+          switchToTrendChart(code, name);
+        });
+      });
+
+      labelsContainer.innerHTML = displayHerbs.map(h =>
+        `<div class="flex-1 text-center text-xs text-gray-500 truncate" title="${h.name}">${h.name.length > 3 ? h.name.slice(0,3)+'..' : h.name}</div>`
+      ).join('');
+
+      hint.textContent = herbs.length > 8 ? `显示前8种（共${herbs.length}种）· 橙色=库存不足 · 点击柱子看趋势` : '各药材库存量分布 · 橙色=库存不足 · 点击柱子看趋势';
+    }
+
+    // ============== 趋势图切换 ==============
+    function switchToTrendChart(herbCode, herbName) {
+      const barPanel = document.getElementById('bar-chart-panel');
+      const trendPanel = document.getElementById('trend-chart-panel');
+      const backBtn = document.getElementById('back-to-bar-chart');
+      const chartTitle = document.getElementById('chart-title');
+
+      // 生成趋势图
+      renderTrendChart(herbCode, herbName);
+
+      // 动画切换
+      barPanel.classList.remove('visible-panel');
+      barPanel.classList.add('hidden-panel');
+      trendPanel.classList.remove('hidden-panel');
+      trendPanel.classList.add('visible-panel');
+
+      backBtn.classList.remove('hidden');
+      chartTitle.textContent = `${herbName} - 库存变化趋势`;
+    }
+
+    function switchToBarChart() {
+      const barPanel = document.getElementById('bar-chart-panel');
+      const trendPanel = document.getElementById('trend-chart-panel');
+      const backBtn = document.getElementById('back-to-bar-chart');
+      const chartTitle = document.getElementById('chart-title');
+
+      trendPanel.classList.remove('visible-panel');
+      trendPanel.classList.add('hidden-panel');
+      barPanel.classList.remove('hidden-panel');
+      barPanel.classList.add('visible-panel');
+
+      backBtn.classList.add('hidden');
+      chartTitle.textContent = '各药材库存量分布（点击柱子查看趋势）';
+    }
+
+    // ============== 渲染库存趋势图（根据日志） ==============
+    function renderTrendChart(herbCode, herbName) {
+      const svg = document.getElementById('trend-svg');
+      const labelsContainer = document.getElementById('trend-chart-labels');
+      const hint = document.getElementById('stock-chart-hint');
+
+      // 从日志中提取该药材的库存变化
+      const logs = cleanupOldLogs().filter(log => log.herbCode === herbCode);
+      logs.sort((a, b) => a.timestamp - b.timestamp);
+
+      // 提取库存数据点
+      const dataPoints = [];
+      logs.forEach(log => {
+        const qtyChange = (log.changes || []).find(c => c.field === 'quantity');
+        if (qtyChange) {
+          if (log.action === 'add' && qtyChange.newValue !== null && qtyChange.newValue !== undefined) {
+            dataPoints.push({ time: log.timestamp, timeStr: log.timeStr, qty: Number(qtyChange.newValue) });
+          } else if (log.action === 'edit' && qtyChange.newValue !== null && qtyChange.newValue !== undefined) {
+            dataPoints.push({ time: log.timestamp, timeStr: log.timeStr, qty: Number(qtyChange.newValue) });
+          }
+        }
+      });
+
+      // 如果没有日志数据，用当前库存作为一个点
+      const herbs = ALL_HERBS;
+      const currentHerb = herbs.find(h => h.code === herbCode);
+      if (dataPoints.length === 0 && currentHerb) {
+        dataPoints.push({ time: Date.now(), timeStr: new Date().toLocaleString('zh-CN', {hour12:false}), qty: currentHerb.quantity });
+      }
+      // 确保最后一个点是当前库存
+      if (currentHerb && (dataPoints.length === 0 || dataPoints[dataPoints.length-1].qty !== currentHerb.quantity)) {
+        dataPoints.push({ time: Date.now(), timeStr: '当前', qty: currentHerb.quantity });
+      }
+
+      if (dataPoints.length === 0) {
+        svg.innerHTML = '<text x="300" y="80" text-anchor="middle" fill="#999" font-size="14">暂无库存变化数据</text>';
+        labelsContainer.innerHTML = '';
+        hint.textContent = `${herbName} 暂无库存变化记录`;
+        return;
+      }
+
+      // 绘制SVG折线图
+      const W = 600, H = 160;
+      const padding = { top: 20, right: 20, bottom: 30, left: 40 };
+      const chartW = W - padding.left - padding.right;
+      const chartH = H - padding.top - padding.bottom;
+
+      const maxQty = Math.max(...dataPoints.map(d => d.qty), 1);
+      const minQty = Math.min(...dataPoints.map(d => d.qty), 0);
+      const qtyRange = maxQty - minQty || 1;
+
+      const threshold = currentHerb ? (currentHerb.warningThreshold || DEFAULT_WARNING_THRESHOLD) : DEFAULT_WARNING_THRESHOLD;
+
+      // 计算点坐标
+      const points = dataPoints.map((d, i) => {
+        const x = padding.left + (dataPoints.length === 1 ? chartW / 2 : (i / (dataPoints.length - 1)) * chartW);
+        const y = padding.top + chartH - ((d.qty - minQty) / qtyRange) * chartH;
+        return { x, y, ...d };
+      });
+
+      // 生成路径
+      const linePath = points.map((p, i) => `${i === 0 ? 'M' : 'L'} ${p.x} ${p.y}`).join(' ');
+      const areaPath = linePath + ` L ${points[points.length-1].x} ${padding.top + chartH} L ${points[0].x} ${padding.top + chartH} Z`;
+
+      // 预警阈值线Y坐标
+      const thresholdY = padding.top + chartH - ((threshold - minQty) / qtyRange) * chartH;
+
+      let svgContent = '';
+
+      // 网格线
+      for (let i = 0; i <= 4; i++) {
+        const y = padding.top + (chartH / 4) * i;
+        const val = Math.round(maxQty - (qtyRange / 4) * i);
+        svgContent += `<line x1="${padding.left}" y1="${y}" x2="${W - padding.right}" y2="${y}" stroke="#eee" stroke-width="1"/>`;
+        svgContent += `<text x="${padding.left - 5}" y="${y + 4}" text-anchor="end" fill="#999" font-size="10">${val}</text>`;
+      }
+
+      // 预警阈值虚线
+      if (thresholdY >= padding.top && thresholdY <= padding.top + chartH) {
+        svgContent += `<line x1="${padding.left}" y1="${thresholdY}" x2="${W - padding.right}" y2="${thresholdY}" stroke="#FF9800" stroke-width="1" stroke-dasharray="4,4"/>`;
+        svgContent += `<text x="${W - padding.right}" y="${thresholdY - 4}" text-anchor="end" fill="#FF9800" font-size="10">预警阈值 ${threshold}</text>`;
+      }
+
+      // 面积填充
+      svgContent += `<path d="${areaPath}" fill="rgba(46,125,50,0.1)"/>`;
+      // 折线
+      svgContent += `<path d="${linePath}" fill="none" stroke="#2E7D32" stroke-width="2.5" class="trend-line"/>`;
+
+      // 数据点
+      points.forEach((p, i) => {
+        const isLow = p.qty <= threshold;
+        const dotColor = isLow ? '#FF9800' : '#2E7D32';
+        svgContent += `<circle cx="${p.x}" cy="${p.y}" r="4" fill="${dotColor}" stroke="white" stroke-width="2" class="trend-dot" style="animation-delay: ${i * 0.1}s"/>`;
+        svgContent += `<text x="${p.x}" y="${p.y - 10}" text-anchor="middle" fill="${dotColor}" font-size="10" font-weight="bold" class="trend-dot" style="animation-delay: ${i * 0.1 + 0.2}s">${p.qty}</text>`;
+      });
+
+      svg.innerHTML = svgContent;
+
+      // X轴标签
+      const labelCount = Math.min(points.length, 5);
+      const step = Math.max(1, Math.floor(points.length / labelCount));
+      let labelsHtml = '';
+      for (let i = 0; i < points.length; i += step) {
+        const timeShort = points[i].timeStr.split(' ')[0] + ' ' + (points[i].timeStr.split(' ')[1] || '').slice(0,5);
+        labelsHtml += `<span>${timeShort}</span>`;
+      }
+      if (points.length > 0 && (points.length - 1) % step !== 0) {
+        const last = points[points.length - 1];
+        labelsHtml += `<span>${last.timeStr.split(' ')[0]}</span>`;
+      }
+      labelsContainer.innerHTML = labelsHtml;
+
+      hint.textContent = `${herbName} 库存变化趋势（共 ${dataPoints.length} 个记录点）· 橙色虚线为预警阈值 · 橙色点为低于阈值`;
+    }
+
+    // ============== 库存预警弹窗 ==============
+    function showStockWarningModal(lowStockHerbs) {
+      const listEl = document.getElementById('warning-herb-list');
+      document.getElementById('warning-summary').textContent =
+        `检测到 ${lowStockHerbs.length} 种药材库存已低于预警阈值，请及时补货：`;
+
+      listEl.innerHTML = lowStockHerbs.map(h => {
+        const threshold = h.warningThreshold || DEFAULT_WARNING_THRESHOLD;
+        const percent = Math.round((h.quantity / threshold) * 100);
+        return `
+          <div class="flex items-center justify-between p-3 bg-yellow-50 rounded-lg border border-yellow-200">
+            <div class="flex-1">
+              <div class="flex items-center justify-between mb-1">
+                <span class="text-sm font-medium text-gray-800">${h.name}</span>
+                <span class="text-sm font-bold text-red-600">${h.quantity} ${h.unit || ''} / 阈值 ${threshold}${h.unit || ''}</span>
+              </div>
+              <div class="w-full bg-gray-200 rounded-full h-2">
+                <div class="bg-red-500 h-2 rounded-full" style="width: ${Math.min(percent, 100)}%"></div>
+              </div>
+            </div>
+          </div>
+        `;
+      }).join('');
+
+      document.getElementById('stock-warning-modal').classList.remove('hidden');
+    }
+
+    // ============== 药材操作日志模态框 ==============
+    function showHerbLogModal(herbCode, herbName) {
+      const logs = cleanupOldLogs().filter(log => log.herbCode === herbCode);
+      logs.sort((a, b) => b.timestamp - a.timestamp);
+
+      document.getElementById('log-modal-title').textContent = `${herbName} - 操作日志`;
+
+      const container = document.getElementById('log-timeline-container');
+      if (logs.length === 0) {
+        container.innerHTML = `
+          <div class="text-center py-12">
+            <div class="w-16 h-16 bg-gray-100 rounded-full flex items-center justify-center text-gray-400 mb-4 mx-auto">
+              <i class="fa fa-history text-2xl"></i>
+            </div>
+            <p class="text-gray-500">暂无操作日志记录</p>
+            <p class="text-xs text-gray-400 mt-1">该药材的新增、编辑、删除操作将在此记录</p>
+          </div>
+        `;
+      } else {
+        container.innerHTML = `<div class="log-timeline">${logs.map(log => {
+          const changesHtml = (log.changes || [])
+            .filter(c => log.action !== 'add' || c.field === 'quantity')
+            .map(c => {
+              const isQty = c.field === 'quantity';
+              return `<div class="log-change ${isQty ? 'bg-yellow-50 border-l-2 border-yellow-400' : ''}">
+                <i class="fa ${isQty ? 'fa-cubes' : 'fa-pencil'} text-xs mr-1"></i>
+                <span class="font-medium">${c.label || c.field}：</span>
+                ${c.oldValue !== null && c.oldValue !== undefined ? `<span class="old">${c.oldValue}</span> → ` : ''}
+                <span class="new">${c.newValue !== null && c.newValue !== undefined ? c.newValue : '已删除'}</span>
+              </div>`;
+            }).join('');
+
+          const actionIcon = log.action === 'add' ? 'fa-plus-circle text-green-600' :
+                             log.action === 'edit' ? 'fa-edit text-blue-600' : 'fa-trash text-red-600';
+
+          return `
+            <div class="log-item action-${log.action}">
+              <div class="bg-white border border-gray-100 rounded-lg p-3 shadow-sm">
+                <div class="flex items-center justify-between mb-1">
+                  <span class="text-sm font-medium text-gray-800">
+                    <i class="fa ${actionIcon} mr-1"></i>${ACTION_TEXT[log.action] || log.action}
+                  </span>
+                  <span class="text-xs text-gray-400">${log.timeStr}</span>
+                </div>
+                <div class="text-xs text-gray-500 mb-1">操作人：${log.operatorName || log.operator}</div>
+                ${changesHtml}
+              </div>
+            </div>
+          `;
+        }).join('')}</div>`;
+      }
+
+      document.getElementById('herb-log-modal').classList.remove('hidden');
+    }
+  </script>
+</body>
+</html>

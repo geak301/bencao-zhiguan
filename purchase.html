@@ -1,0 +1,663 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>采购管理 - 本草智管平台</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
+        body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", "PingFang SC", "Microsoft YaHei", sans-serif; background: #f5f7fa; }
+        .sidebar { width: 240px; background: linear-gradient(180deg, #1a365d 0%, #2c5282 100%); min-height: 100vh; position: fixed; left: 0; top: 0; color: white; overflow-y: auto; z-index: 40; transform: translateX(-100%); transition: transform 0.3s ease; }
+        .sidebar.open { transform: translateX(0); }
+        @media (min-width: 768px) { .sidebar { transform: translateX(0); position: fixed; } }
+        .sidebar-overlay { display: none; position: fixed; inset: 0; background: rgba(0,0,0,0.5); z-index: 35; }
+        .sidebar-overlay.show { display: block; }
+        .sidebar-brand { padding: 20px; text-align: center; border-bottom: 1px solid rgba(255,255,255,0.1); }
+        .sidebar-brand h1 { font-size: 18px; font-weight: 600; }
+        .sidebar-brand p { font-size: 12px; opacity: 0.7; margin-top: 4px; }
+        .nav-item { display: flex; align-items: center; padding: 12px 20px; color: rgba(255,255,255,0.8); text-decoration: none; transition: all 0.2s; cursor: pointer; }
+        .nav-item:hover { background: rgba(255,255,255,0.1); color: white; }
+        .nav-item.active { background: rgba(255,255,255,0.15); color: white; border-left: 3px solid #68d391; }
+        .nav-item i { width: 20px; margin-right: 12px; }
+        .nav-section { padding: 16px 20px 8px; font-size: 11px; text-transform: uppercase; opacity: 0.5; letter-spacing: 1px; }
+        .main { margin-left: 0; min-height: 100vh; display: flex; flex-direction: column; }
+        @media (min-width: 768px) { .main { margin-left: 240px; } }
+        .topbar { background: white; padding: 12px 16px; display: flex; justify-content: space-between; align-items: center; box-shadow: 0 1px 3px rgba(0,0,0,0.05); position: sticky; top: 0; z-index: 30; }
+        @media (min-width: 768px) { .topbar { padding: 12px 24px; } }
+        .topbar h2 { font-size: 16px; font-weight: 600; color: #2d3748; display: flex; align-items: center; gap: 8px; }
+        @media (min-width: 768px) { .topbar h2 { font-size: 18px; } }
+        .menu-btn { background: none; border: none; font-size: 20px; color: #2d3748; cursor: pointer; padding: 4px 8px; }
+        @media (min-width: 768px) { .menu-btn { display: none; } }
+        .user-info { display: flex; align-items: center; gap: 8px; }
+        @media (min-width: 768px) { .user-info { gap: 12px; } }
+        .user-avatar { width: 32px; height: 32px; border-radius: 50%; background: linear-gradient(135deg, #68d391, #38a169); display: flex; align-items: center; justify-content: center; color: white; font-weight: 600; font-size: 14px; }
+        @media (min-width: 768px) { .user-avatar { width: 36px; height: 36px; } }
+        .role-badge { display: inline-block; padding: 2px 8px; border-radius: 10px; font-size: 10px; font-weight: 500; }
+        @media (min-width: 768px) { .role-badge { font-size: 11px; } }
+        .role-badge.doctor { background: #bee3f8; color: #2c5282; }
+        .role-badge.admin { background: #fefcbf; color: #975a16; }
+        .role-badge.patient { background: #c6f6d5; color: #276749; }
+        .content { flex: 1; padding: 16px; }
+        @media (min-width: 768px) { .content { padding: 24px; } }
+    </style>
+
+
+    <!-- PWA 支持 -->
+    <link rel="manifest" href="/manifest.json">
+    <meta name="theme-color" content="#1a365d">
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+    <meta name="apple-mobile-web-app-title" content="本草智管">
+    <link rel="apple-touch-icon" href="/icon-192x192.png">
+    <link rel="icon" type="image/x-icon" href="/favicon.ico">
+
+</head>
+<body>
+    <div class="sidebar-overlay" id="sidebar-overlay" onclick="toggleSidebar()"></div>
+    <div class="sidebar" id="sidebar">
+
+        <div class="sidebar-brand">
+          <h1><i class="fas fa-leaf"></i> 本草智管</h1>
+          <p>中医门诊药材库存管理系统</p>
+        </div>
+        <div id="nav-menu">
+          <div class="nav-section">核心功能</div>
+          <div class="nav-item" onclick="location.href='dashboard.html'"><i class="fas fa-tachometer-alt"></i>控制面板</div>
+          <div class="nav-item" onclick="location.href='prescriptions.html'"><i class="fas fa-file-prescription"></i>处方管理</div>
+          <div class="nav-item" onclick="location.href='data-board.html'"><i class="fas fa-chart-bar"></i>数据看板</div>
+          <div class="nav-item" onclick="location.href='assistant.html'"><i class="fas fa-robot"></i>智能助手</div>
+          <div class="nav-section">库存管理</div>
+          <div class="nav-item" onclick="location.href='herbs.html'"><i class="fas fa-boxes"></i>药材管理</div>
+          <div class="nav-item" onclick="location.href='purchase.html'"><i class="fas fa-truck-loading"></i>采购管理</div>
+          <div class="nav-item" onclick="location.href='replenish.html'"><i class="fas fa-bell"></i>库存预警/补货</div>
+          <div class="nav-item" onclick="location.href='stock-flow.html'"><i class="fas fa-exchange-alt"></i>库存流水</div>
+          <div class="nav-section">系统管理</div>
+          <div class="nav-item" onclick="location.href='users.html'"><i class="fas fa-users"></i>用户管理</div>
+          <div class="nav-item" onclick="location.href='logs.html'"><i class="fas fa-history"></i>操作日志</div>
+          <div class="nav-item" onclick="logout()"><i class="fas fa-sign-out-alt"></i>退出登录</div>
+        </div>
+
+    </div>
+
+    <div class="main">
+        <div class="topbar">
+            <div style="display:flex;align-items:center;gap:8px;">
+                <button class="menu-btn" onclick="toggleSidebar()"><i class="fas fa-bars"></i></button>
+                <h2><i class="fas fa-truck-loading" style="color:#68d391;"></i> 采购管理</h2>
+            </div>
+            <div class="user-info">
+                <span id="topbar-role-badge" class="role-badge"></span>
+                <span id="topbar-username" style="font-size:13px;color:#4a5568;"></span>
+                <div class="user-avatar" id="topbar-avatar"></div>
+            </div>
+        </div>
+
+        <!-- 兼容层：旧布局元素的隐藏占位，防止原JS报错 -->
+        <div style="display:none;">
+            <button id="sidebar-toggle"></button>
+            <span id="welcome-message"></span>
+            <p id="sidebar-username"></p>
+            <p id="sidebar-role"></p>
+            <button id="logout-btn" onclick="logout()"></button>
+            <nav id="sidebar-nav"></nav>
+        </div>
+
+        <div class="content">
+<div class="space-y-6">
+        <div class="flex items-center justify-between">
+          <div>
+            <h2 class="text-2xl font-bold text-gray-800">采购管理</h2>
+            <p class="text-gray-500 mt-1">管理药材采购订单，支持创建、审核、入库全流程</p>
+          </div>
+          <button id="btn-new-po" class="px-4 py-2 bg-primary text-white rounded-lg font-medium hover:bg-green-700 transition-colors">
+            <i class="fa fa-plus mr-1"></i> 新建采购单
+          </button>
+        </div>
+
+        <!-- 统计卡片 -->
+        <div class="grid grid-cols-1 md:grid-cols-4 gap-4">
+          <div class="bg-white rounded-xl p-4 shadow-md">
+            <p class="text-sm text-gray-500">采购单总数</p>
+            <p class="text-2xl font-bold text-gray-800 mt-1" id="stat-total">0</p>
+          </div>
+          <div class="bg-white rounded-xl p-4 shadow-md">
+            <p class="text-sm text-gray-500">待审核</p>
+            <p class="text-2xl font-bold text-yellow-600 mt-1" id="stat-pending">0</p>
+          </div>
+          <div class="bg-white rounded-xl p-4 shadow-md">
+            <p class="text-sm text-gray-500">已入库</p>
+            <p class="text-2xl font-bold text-green-600 mt-1" id="stat-completed">0</p>
+          </div>
+          <div class="bg-white rounded-xl p-4 shadow-md">
+            <p class="text-sm text-gray-500">采购总金额</p>
+            <p class="text-2xl font-bold text-blue-600 mt-1">¥<span id="stat-amount">0</span></p>
+          </div>
+        </div>
+
+        <!-- 筛选栏 -->
+        <div class="bg-white rounded-xl p-4 shadow-md">
+          <div class="flex flex-wrap items-center gap-4">
+            <div class="flex items-center gap-2">
+              <span class="text-sm text-gray-600">状态：</span>
+              <select id="filter-status" class="border border-gray-300 rounded-lg px-3 py-1.5 text-sm focus:outline-none focus:ring-2 focus:ring-primary/50">
+                <option value="">全部</option>
+                <option value="pending">待审核</option>
+                <option value="approved">已审核</option>
+                <option value="completed">已入库</option>
+                <option value="rejected">已拒绝</option>
+              </select>
+            </div>
+            <div class="flex items-center gap-2 flex-1 min-w-[200px]">
+              <input type="text" id="filter-keyword" placeholder="搜索采购单号/供应商..." class="flex-1 border border-gray-300 rounded-lg px-3 py-1.5 text-sm focus:outline-none focus:ring-2 focus:ring-primary/50">
+              <button id="btn-search" class="px-4 py-1.5 bg-primary text-white rounded-lg text-sm hover:bg-green-700 transition-colors">
+                <i class="fa fa-search mr-1"></i> 搜索
+              </button>
+            </div>
+          </div>
+        </div>
+
+        <!-- 采购单列表 -->
+        <div class="bg-white rounded-xl shadow-md overflow-hidden">
+          <div class="overflow-x-auto">
+            <table class="w-full">
+              <thead class="bg-gray-50 border-b">
+                <tr>
+                  <th class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">采购单号</th>
+                  <th class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">供应商</th>
+                  <th class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">药材种类</th>
+                  <th class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">总金额</th>
+                  <th class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">状态</th>
+                  <th class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">创建人</th>
+                  <th class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">创建时间</th>
+                  <th class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">操作</th>
+                </tr>
+              </thead>
+              <tbody id="po-table-body" class="divide-y divide-gray-200">
+                <tr><td colspan="8" class="px-4 py-8 text-center text-gray-400">加载中...</td></tr>
+              </tbody>
+            </table>
+          </div>
+        </div>
+      </div>
+    </main>
+  </div>
+
+  <!-- 新建/编辑采购单弹窗 -->
+  <div id="po-modal" class="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 hidden">
+    <div class="bg-white rounded-xl p-6 w-full max-w-3xl mx-4">
+      <div class="flex justify-between items-center mb-4">
+        <h3 class="text-xl font-bold text-gray-800" id="po-modal-title">新建采购单</h3>
+        <button id="po-modal-close" class="text-gray-400 hover:text-gray-600"><i class="fa fa-times text-xl"></i></button>
+      </div>
+      <div class="modal-scroll">
+        <div class="grid grid-cols-2 gap-4 mb-4">
+          <div>
+            <label class="block text-sm font-medium text-gray-700 mb-1">供应商 <span class="text-red-500">*</span></label>
+            <select id="po-supplier" class="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary/50">
+              <option value="">请选择供应商</option>
+            </select>
+          </div>
+          <div>
+            <label class="block text-sm font-medium text-gray-700 mb-1">备注</label>
+            <input type="text" id="po-remark" class="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary/50" placeholder="选填">
+          </div>
+        </div>
+
+        <div class="mb-4">
+          <div class="flex justify-between items-center mb-2">
+            <label class="block text-sm font-medium text-gray-700">药材明细 <span class="text-red-500">*</span></label>
+            <button id="btn-add-item" class="text-sm text-primary hover:text-green-700 font-medium">
+              <i class="fa fa-plus-circle mr-1"></i> 添加药材
+            </button>
+          </div>
+          <div class="border rounded-lg overflow-hidden">
+            <table class="w-full text-sm">
+              <thead class="bg-gray-50">
+                <tr>
+                  <th class="px-3 py-2 text-left">药材</th>
+                  <th class="px-3 py-2 text-left w-24">数量</th>
+                  <th class="px-3 py-2 text-left w-20">单位</th>
+                  <th class="px-3 py-2 text-left w-24">单价</th>
+                  <th class="px-3 py-2 text-left w-24">小计</th>
+                  <th class="px-3 py-2 text-left w-12">操作</th>
+                </tr>
+              </thead>
+              <tbody id="po-items-body"></tbody>
+            </table>
+          </div>
+        </div>
+
+        <div class="flex justify-between items-center p-3 bg-gray-50 rounded-lg">
+          <span class="text-sm text-gray-600">合计金额：</span>
+          <span class="text-xl font-bold text-primary">¥<span id="po-total">0.00</span></span>
+        </div>
+      </div>
+      <div class="flex justify-end space-x-3 mt-4">
+        <button id="po-cancel" class="px-4 py-2 border border-gray-300 rounded-lg font-medium hover:bg-gray-50 transition-colors">取消</button>
+        <button id="po-save" class="px-4 py-2 bg-primary text-white rounded-lg font-medium hover:bg-green-700 transition-colors">
+          <i class="fa fa-save mr-1"></i> 提交采购单
+        </button>
+      </div>
+    </div>
+  </div>
+
+  <!-- 采购单详情弹窗 -->
+  <div id="po-detail-modal" class="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 hidden">
+    <div class="bg-white rounded-xl p-6 w-full max-w-3xl mx-4">
+      <div class="flex justify-between items-center mb-4">
+        <h3 class="text-xl font-bold text-gray-800">采购单详情</h3>
+        <button id="detail-close" class="text-gray-400 hover:text-gray-600"><i class="fa fa-times text-xl"></i></button>
+      </div>
+      <div class="modal-scroll" id="po-detail-content"></div>
+      <div class="flex justify-end space-x-3 mt-4" id="detail-actions"></div>
+    </div>
+        </div>
+    </div>
+
+    <script>
+
+    // ===== 统一布局工具函数 =====
+    function toggleSidebar() {
+      document.getElementById('sidebar').classList.toggle('open');
+      document.getElementById('sidebar-overlay').classList.toggle('show');
+    }
+    function logout() {
+      sessionStorage.removeItem('current_user');
+      sessionStorage.removeItem('current_role');
+      sessionStorage.removeItem('current_name');
+      window.location.href = 'index.html';
+    }
+    function initUnifiedLayout(pageName) {
+      const currentUser = sessionStorage.getItem('current_user');
+      const currentRole = sessionStorage.getItem('current_role');
+      const currentName = sessionStorage.getItem('current_name') || currentUser;
+      if (!currentUser) { window.location.href = 'index.html'; return; }
+      const roleText = { admin: '管理员', doctor: '医生', patient: '患者' };
+      const userNameEl = document.getElementById('topbar-username');
+      const userAvatarEl = document.getElementById('topbar-avatar');
+      const roleBadgeEl = document.getElementById('topbar-role-badge');
+      if (userNameEl) userNameEl.textContent = currentName;
+      if (userAvatarEl) userAvatarEl.textContent = currentName.charAt(0);
+      if (roleBadgeEl) {
+        roleBadgeEl.className = 'role-badge ' + currentRole;
+        roleBadgeEl.textContent = roleText[currentRole] || currentRole;
+      }
+      document.querySelectorAll('.nav-item').forEach(item => {
+        if (item.textContent.includes(pageName)) item.classList.add('active');
+      });
+      const rolePermissions = {
+        patient: ['控制面板', '处方管理', '数据看板', '智能助手', '退出登录'],
+        doctor: ['控制面板', '处方管理', '数据看板', '药材管理', '智能助手', '采购管理', '库存预警/补货', '库存流水', '退出登录'],
+        admin: ['控制面板', '处方管理', '数据看板', '药材管理', '智能助手', '采购管理', '库存预警/补货', '库存流水', '用户管理', '操作日志', '退出登录'],
+      };
+      const allowed = rolePermissions[currentRole] || [];
+      document.querySelectorAll('.nav-item').forEach(item => {
+        const text = item.textContent.trim();
+        if (!allowed.some(a => text.includes(a))) item.style.display = 'none';
+      });
+    }
+
+
+// ===== 原页面业务逻辑 =====
+tailwind.config = {
+      theme: {
+        extend: {
+          colors: {
+            primary: '#2E7D32',
+            secondary: '#8D6E63',
+            accent: '#D32F2F',
+            neutral: '#F5F5F5',
+          }
+        }
+      }
+    }
+
+const API_BASE = '';
+    async function api(method, url, body) {
+      const opts = { method: method, headers: { 'Content-Type': 'application/json', 'X-User': sessionStorage.getItem('current_user') || '' } };
+      if (body !== undefined) opts.body = JSON.stringify(body);
+      const resp = await fetch(API_BASE + url, opts);
+      const result = await resp.json().catch(() => ({ code: -1, message: '服务器连接失败' }));
+      if (result.code !== 0) { alert(result.message); throw new Error(result.message); }
+      return result.data;
+    }
+
+    const STATUS_TEXT = { pending: '待审核', approved: '已审核', completed: '已入库', rejected: '已拒绝' };
+    let allHerbs = [];
+    let allSuppliers = [];
+
+    document.addEventListener('DOMContentLoaded', async () => {
+      const currentUser = sessionStorage.getItem('current_user');
+      const currentRole = sessionStorage.getItem('current_role');
+      const currentName = sessionStorage.getItem('current_name') || currentUser;
+      if (!currentUser) window.location.href = 'index.html';
+
+      const roleText = { admin: '管理员', doctor: '医生', patient: '病人' };
+      document.getElementById('welcome-message').textContent = `欢迎，${currentName}`;
+      document.getElementById('sidebar-username').textContent = currentName;
+      document.getElementById('sidebar-role').textContent = roleText[currentRole] || '用户';
+
+      document.querySelectorAll('#sidebar-nav > a').forEach(item => {
+        const allowedRoles = item.dataset.role.split(',');
+        if (!allowedRoles.includes(currentRole)) item.classList.add('hidden');
+      });
+
+      document.getElementById('sidebar-toggle').addEventListener('click', () => {
+        document.getElementById('sidebar').classList.toggle('-translate-x-full');
+      });
+      document.getElementById('logout-btn').addEventListener('click', () => {
+        sessionStorage.clear();
+        window.location.href = 'index.html';
+      });
+
+      // 加载基础数据
+      try {
+        [allHerbs, allSuppliers] = await Promise.all([
+          api('GET', '/api/herbs'),
+          api('GET', '/api/suppliers')
+        ]);
+        initSupplierSelect();
+      } catch (e) { console.error(e); }
+
+      // 绑定事件
+      document.getElementById('btn-new-po').addEventListener('click', openNewPoModal);
+      document.getElementById('btn-search').addEventListener('click', loadPurchaseOrders);
+      document.getElementById('filter-status').addEventListener('change', loadPurchaseOrders);
+      document.getElementById('po-modal-close').addEventListener('click', closePoModal);
+      document.getElementById('po-cancel').addEventListener('click', closePoModal);
+      document.getElementById('po-save').addEventListener('click', savePurchaseOrder);
+      document.getElementById('btn-add-item').addEventListener('click', addPoItemRow);
+      document.getElementById('detail-close').addEventListener('click', () => {
+        document.getElementById('po-detail-modal').classList.add('hidden');
+      });
+
+      loadPurchaseOrders();
+    });
+
+    function initSupplierSelect() {
+      const sel = document.getElementById('po-supplier');
+      sel.innerHTML = '<option value="">请选择供应商</option>' +
+        allSuppliers.map(s => `<option value="${s.id}" data-name="${s.name}">${s.name}</option>`).join('');
+    }
+
+    async function loadPurchaseOrders() {
+      const status = document.getElementById('filter-status').value;
+      const keyword = document.getElementById('filter-keyword').value;
+      let url = '/api/purchase-orders?';
+      if (status) url += `status=${status}&`;
+      if (keyword) url += `keyword=${encodeURIComponent(keyword)}&`;
+
+      try {
+        const list = await api('GET', url);
+        renderPoTable(list);
+        updateStats(list);
+      } catch (e) {
+        document.getElementById('po-table-body').innerHTML = '<tr><td colspan="8" class="px-4 py-8 text-center text-red-400">加载失败</td></tr>';
+      }
+    }
+
+    function updateStats(list) {
+      document.getElementById('stat-total').textContent = list.length;
+      document.getElementById('stat-pending').textContent = list.filter(p => p.status === 'pending').length;
+      document.getElementById('stat-completed').textContent = list.filter(p => p.status === 'completed').length;
+      const total = list.filter(p => p.status === 'completed').reduce((acc, p) => acc + (p.totalAmount || 0), 0);
+      document.getElementById('stat-amount').textContent = total.toFixed(2);
+    }
+
+    function renderPoTable(list) {
+      const tbody = document.getElementById('po-table-body');
+      if (list.length === 0) {
+        tbody.innerHTML = '<tr><td colspan="8" class="px-4 py-8 text-center text-gray-400">暂无采购单</td></tr>';
+        return;
+      }
+      tbody.innerHTML = list.map(po => `
+        <tr class="hover:bg-gray-50">
+          <td class="px-4 py-3 text-sm font-medium text-primary">${po.orderNo}</td>
+          <td class="px-4 py-3 text-sm text-gray-700">${po.supplierName || '-'}</td>
+          <td class="px-4 py-3 text-sm text-gray-700">${po.items.length} 种</td>
+          <td class="px-4 py-3 text-sm font-medium text-gray-800">¥${(po.totalAmount || 0).toFixed(2)}</td>
+          <td class="px-4 py-3"><span class="status-badge status-${po.status}">${po.statusText || STATUS_TEXT[po.status]}</span></td>
+          <td class="px-4 py-3 text-sm text-gray-700">${po.creatorName || '-'}</td>
+          <td class="px-4 py-3 text-sm text-gray-500">${po.createdAt ? po.createdAt.split(' ')[0] : '-'}</td>
+          <td class="px-4 py-3 text-sm">
+            <button onclick="viewPoDetail(${po.id})" class="text-primary hover:text-green-700 mr-2" title="查看详情"><i class="fa fa-eye"></i></button>
+            ${po.status === 'pending' ? `<button onclick="auditPo(${po.id})" class="text-yellow-600 hover:text-yellow-700 mr-2" title="审核"><i class="fa fa-check-circle"></i></button>` : ''}
+            ${po.status === 'approved' ? `<button onclick="inStockPo(${po.id})" class="text-green-600 hover:text-green-700 mr-2" title="入库"><i class="fa fa-download"></i></button>` : ''}
+            ${po.status !== 'completed' ? `<button onclick="deletePo(${po.id})" class="text-red-500 hover:text-red-600" title="删除"><i class="fa fa-trash"></i></button>` : ''}
+          </td>
+        </tr>
+      `).join('');
+    }
+
+    function openNewPoModal() {
+      document.getElementById('po-modal-title').textContent = '新建采购单';
+      document.getElementById('po-supplier').value = '';
+      document.getElementById('po-remark').value = '';
+      document.getElementById('po-items-body').innerHTML = '';
+      addPoItemRow();
+      document.getElementById('po-modal').classList.remove('hidden');
+    }
+
+    function closePoModal() {
+      document.getElementById('po-modal').classList.add('hidden');
+    }
+
+    function addPoItemRow() {
+      const tbody = document.getElementById('po-items-body');
+      const row = document.createElement('tr');
+      row.className = 'border-t';
+      row.innerHTML = `
+        <td class="px-3 py-2">
+          <select class="herb-select w-full border border-gray-300 rounded px-2 py-1 text-sm" onchange="onHerbChange(this)">
+            <option value="">选择药材</option>
+            ${allHerbs.map(h => `<option value="${h.code}" data-name="${h.name}" data-price="${h.price}" data-unit="${h.unit}">${h.name} (${h.code})</option>`).join('')}
+          </select>
+        </td>
+        <td class="px-3 py-2"><input type="number" class="item-qty w-full border border-gray-300 rounded px-2 py-1 text-sm" value="100" min="1" onchange="calcPoTotal()"></td>
+        <td class="px-3 py-2"><input type="text" class="item-unit w-full border border-gray-300 rounded px-2 py-1 text-sm" value="g"></td>
+        <td class="px-3 py-2"><input type="number" class="item-price w-full border border-gray-300 rounded px-2 py-1 text-sm" value="0" step="0.01" min="0" onchange="calcPoTotal()"></td>
+        <td class="px-3 py-2 item-subtotal text-sm font-medium text-gray-700">0.00</td>
+        <td class="px-3 py-2"><button onclick="this.closest('tr').remove(); calcPoTotal();" class="text-red-500 hover:text-red-600"><i class="fa fa-times"></i></button></td>
+      `;
+      tbody.appendChild(row);
+    }
+
+    function onHerbChange(select) {
+      const opt = select.options[select.selectedIndex];
+      const row = select.closest('tr');
+      if (opt.value) {
+        row.querySelector('.item-price').value = opt.dataset.price;
+        row.querySelector('.item-unit').value = opt.dataset.unit;
+      }
+      calcPoTotal();
+    }
+
+    function calcPoTotal() {
+      let total = 0;
+      document.querySelectorAll('#po-items-body tr').forEach(row => {
+        const qty = parseFloat(row.querySelector('.item-qty').value) || 0;
+        const price = parseFloat(row.querySelector('.item-price').value) || 0;
+        const subtotal = qty * price;
+        row.querySelector('.item-subtotal').textContent = subtotal.toFixed(2);
+        total += subtotal;
+      });
+      document.getElementById('po-total').textContent = total.toFixed(2);
+    }
+
+    async function savePurchaseOrder() {
+      const supplierId = document.getElementById('po-supplier').value;
+      const supplierName = document.getElementById('po-supplier').selectedOptions[0]?.dataset.name || '';
+      const remark = document.getElementById('po-remark').value;
+
+      if (!supplierId) { alert('请选择供应商'); return; }
+
+      const items = [];
+      let valid = true;
+      document.querySelectorAll('#po-items-body tr').forEach(row => {
+        const select = row.querySelector('.herb-select');
+        const opt = select.options[select.selectedIndex];
+        if (!opt.value) { valid = false; return; }
+        items.push({
+          herbCode: opt.value,
+          herbName: opt.dataset.name,
+          quantity: parseInt(row.querySelector('.item-qty').value) || 0,
+          unit: row.querySelector('.item-unit').value,
+          price: parseFloat(row.querySelector('.item-price').value) || 0,
+        });
+      });
+
+      if (!valid) { alert('请选择所有行的药材'); return; }
+      if (items.length === 0) { alert('请至少添加一味药材'); return; }
+
+      try {
+        await api('POST', '/api/purchase-orders', { supplierId, supplierName, remark, items });
+        closePoModal();
+        loadPurchaseOrders();
+        alert('采购单创建成功');
+      } catch (e) { /* error already shown */ }
+    }
+
+    async function viewPoDetail(id) {
+      try {
+        const po = await api('GET', `/api/purchase-orders/${id}`);
+        const content = document.getElementById('po-detail-content');
+        content.innerHTML = `
+          <div class="grid grid-cols-2 gap-4 mb-4">
+            <div><p class="text-sm text-gray-500">采购单号</p><p class="font-medium">${po.orderNo}</p></div>
+            <div><p class="text-sm text-gray-500">供应商</p><p class="font-medium">${po.supplierName || '-'}</p></div>
+            <div><p class="text-sm text-gray-500">状态</p><p><span class="status-badge status-${po.status}">${po.statusText}</span></p></div>
+            <div><p class="text-sm text-gray-500">总金额</p><p class="font-medium text-primary">¥${(po.totalAmount || 0).toFixed(2)}</p></div>
+            <div><p class="text-sm text-gray-500">创建人</p><p class="font-medium">${po.creatorName || '-'}</p></div>
+            <div><p class="text-sm text-gray-500">创建时间</p><p class="font-medium">${po.createdAt || '-'}</p></div>
+            ${po.auditorName ? `<div><p class="text-sm text-gray-500">审核人</p><p class="font-medium">${po.auditorName}</p></div>` : ''}
+            ${po.auditTime ? `<div><p class="text-sm text-gray-500">审核时间</p><p class="font-medium">${po.auditTime}</p></div>` : ''}
+            ${po.inStockTime ? `<div><p class="text-sm text-gray-500">入库时间</p><p class="font-medium">${po.inStockTime}</p></div>` : ''}
+            ${po.remark ? `<div class="col-span-2"><p class="text-sm text-gray-500">备注</p><p class="font-medium">${po.remark}</p></div>` : ''}
+          </div>
+          <div class="border rounded-lg overflow-hidden">
+            <table class="w-full text-sm">
+              <thead class="bg-gray-50">
+                <tr><th class="px-3 py-2 text-left">药材编码</th><th class="px-3 py-2 text-left">药材名称</th><th class="px-3 py-2 text-left">数量</th><th class="px-3 py-2 text-left">单价</th><th class="px-3 py-2 text-left">小计</th><th class="px-3 py-2 text-left">已入库</th></tr>
+              </thead>
+              <tbody>
+                ${po.items.map(i => `<tr class="border-t"><td class="px-3 py-2">${i.herbCode}</td><td class="px-3 py-2">${i.herbName}</td><td class="px-3 py-2">${i.quantity}${i.unit}</td><td class="px-3 py-2">¥${i.price.toFixed(2)}</td><td class="px-3 py-2">¥${i.subtotal.toFixed(2)}</td><td class="px-3 py-2">${i.receivedQuantity}${i.unit}</td></tr>`).join('')}
+              </tbody>
+            </table>
+          </div>
+        `;
+
+        const actions = document.getElementById('detail-actions');
+        let btns = '<button onclick="document.getElementById(\'po-detail-modal\').classList.add(\'hidden\')" class="px-4 py-2 border border-gray-300 rounded-lg font-medium hover:bg-gray-50">关闭</button>';
+        if (po.status === 'pending') {
+          btns += `<button onclick="auditPo(${po.id})" class="px-4 py-2 bg-yellow-500 text-white rounded-lg font-medium hover:bg-yellow-600"><i class="fa fa-check-circle mr-1"></i> 审核</button>`;
+        }
+        if (po.status === 'approved') {
+          btns += `<button onclick="inStockPo(${po.id})" class="px-4 py-2 bg-green-600 text-white rounded-lg font-medium hover:bg-green-700"><i class="fa fa-download mr-1"></i> 确认入库</button>`;
+        }
+        actions.innerHTML = btns;
+
+        document.getElementById('po-detail-modal').classList.remove('hidden');
+      } catch (e) { /* error shown */ }
+    }
+
+    async function auditPo(id) {
+      if (!confirm('确认审核通过该采购单？')) return;
+      try {
+        await api('PUT', `/api/purchase-orders/${id}/audit`, { action: 'approve' });
+        alert('审核通过');
+        document.getElementById('po-detail-modal').classList.add('hidden');
+        loadPurchaseOrders();
+      } catch (e) { /* error shown */ }
+    }
+
+    async function inStockPo(id) {
+      if (!confirm('确认入库？入库后将自动增加药材库存。')) return;
+      try {
+        await api('PUT', `/api/purchase-orders/${id}/in-stock`);
+        alert('入库成功，库存已更新');
+        document.getElementById('po-detail-modal').classList.add('hidden');
+        loadPurchaseOrders();
+      } catch (e) { /* error shown */ }
+    }
+
+    async function deletePo(id) {
+      if (!confirm('确认删除该采购单？')) return;
+      try {
+        await api('DELETE', `/api/purchase-orders/${id}`);
+        alert('删除成功');
+        loadPurchaseOrders();
+      } catch (e) { /* error shown */ }
+    }
+
+// ===== 初始化统一布局 =====
+initUnifiedLayout("采购管理");
+    </script>
+
+    <!-- PWA Service Worker 注册 -->
+    <script>
+    if ('serviceWorker' in navigator) {
+        window.addEventListener('load', function() {
+            navigator.serviceWorker.register('/sw.js')
+                .then(function(registration) {
+                    console.log('PWA: Service Worker 注册成功，范围:', registration.scope);
+                    
+                    // 监听更新
+                    registration.addEventListener('updatefound', function() {
+                        const newWorker = registration.installing;
+                        newWorker.addEventListener('statechange', function() {
+                            if (newWorker.state === 'installed' && navigator.serviceWorker.controller) {
+                                // 显示更新提示
+                                if (confirm('发现新版本，是否立即更新？')) {
+                                    newWorker.postMessage('SKIP_WAITING');
+                                    location.reload();
+                                }
+                            }
+                        });
+                    });
+                })
+                .catch(function(error) {
+                    console.log('PWA: Service Worker 注册失败:', error);
+                });
+        });
+    }
+    
+    // PWA 安装提示
+    let deferredPrompt;
+    window.addEventListener('beforeinstallprompt', function(e) {
+        e.preventDefault();
+        deferredPrompt = e;
+        console.log('PWA: 可以安装应用');
+        
+        // 显示安装按钮（如果有安装按钮元素）
+        const installBtn = document.getElementById('pwa-install-btn');
+        if (installBtn) {
+            installBtn.style.display = 'flex';
+            installBtn.addEventListener('click', function() {
+                if (deferredPrompt) {
+                    deferredPrompt.prompt();
+                    deferredPrompt.userChoice.then(function(choiceResult) {
+                        if (choiceResult.outcome === 'accepted') {
+                            console.log('PWA: 用户接受安装');
+                        }
+                        deferredPrompt = null;
+                        installBtn.style.display = 'none';
+                    });
+                }
+            });
+        }
+    });
+    
+    window.addEventListener('appinstalled', function() {
+        console.log('PWA: 应用已安装');
+        const installBtn = document.getElementById('pwa-install-btn');
+        if (installBtn) {
+            installBtn.style.display = 'none';
+        }
+    });
+    </script>
+
+</body>
+</html>

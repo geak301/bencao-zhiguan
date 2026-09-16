@@ -1,0 +1,746 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>智能诊疗助手 - 本草智管平台</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
+        body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", "PingFang SC", "Microsoft YaHei", sans-serif; background: #f5f7fa; }
+        .sidebar { width: 240px; background: linear-gradient(180deg, #1a365d 0%, #2c5282 100%); min-height: 100vh; position: fixed; left: 0; top: 0; color: white; overflow-y: auto; z-index: 40; transform: translateX(-100%); transition: transform 0.3s ease; }
+        .sidebar.open { transform: translateX(0); }
+        @media (min-width: 768px) { .sidebar { transform: translateX(0); position: fixed; } }
+        .sidebar-overlay { display: none; position: fixed; inset: 0; background: rgba(0,0,0,0.5); z-index: 35; }
+        .sidebar-overlay.show { display: block; }
+        .sidebar-brand { padding: 20px; text-align: center; border-bottom: 1px solid rgba(255,255,255,0.1); }
+        .sidebar-brand h1 { font-size: 18px; font-weight: 600; }
+        .sidebar-brand p { font-size: 12px; opacity: 0.7; margin-top: 4px; }
+        .nav-item { display: flex; align-items: center; padding: 12px 20px; color: rgba(255,255,255,0.8); text-decoration: none; transition: all 0.2s; cursor: pointer; }
+        .nav-item:hover { background: rgba(255,255,255,0.1); color: white; }
+        .nav-item.active { background: rgba(255,255,255,0.15); color: white; border-left: 3px solid #68d391; }
+        .nav-item i { width: 20px; margin-right: 12px; }
+        .nav-section { padding: 16px 20px 8px; font-size: 11px; text-transform: uppercase; opacity: 0.5; letter-spacing: 1px; }
+        .main { margin-left: 0; min-height: 100vh; display: flex; flex-direction: column; }
+        @media (min-width: 768px) { .main { margin-left: 240px; } }
+        .topbar { background: white; padding: 12px 16px; display: flex; justify-content: space-between; align-items: center; box-shadow: 0 1px 3px rgba(0,0,0,0.05); position: sticky; top: 0; z-index: 30; }
+        @media (min-width: 768px) { .topbar { padding: 12px 24px; } }
+        .topbar h2 { font-size: 16px; font-weight: 600; color: #2d3748; display: flex; align-items: center; gap: 8px; }
+        @media (min-width: 768px) { .topbar h2 { font-size: 18px; } }
+        .menu-btn { background: none; border: none; font-size: 20px; color: #2d3748; cursor: pointer; padding: 4px 8px; }
+        @media (min-width: 768px) { .menu-btn { display: none; } }
+        .user-info { display: flex; align-items: center; gap: 8px; }
+        @media (min-width: 768px) { .user-info { gap: 12px; } }
+        .user-avatar { width: 32px; height: 32px; border-radius: 50%; background: linear-gradient(135deg, #68d391, #38a169); display: flex; align-items: center; justify-content: center; color: white; font-weight: 600; font-size: 14px; }
+        @media (min-width: 768px) { .user-avatar { width: 36px; height: 36px; } }
+        .chat-container { flex: 1; display: flex; flex-direction: column; max-width: 900px; margin: 0 auto; width: 100%; padding: 12px; }
+        @media (min-width: 768px) { .chat-container { padding: 20px; } }
+        .chat-messages { flex: 1; overflow-y: auto; padding: 12px 0; }
+        .message { display: flex; margin-bottom: 16px; animation: fadeIn 0.3s ease; }
+        @keyframes fadeIn { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: translateY(0); } }
+        .message.user { justify-content: flex-end; }
+        .message-avatar { width: 36px; height: 36px; border-radius: 50%; display: flex; align-items: center; justify-content: center; flex-shrink: 0; font-size: 14px; }
+        @media (min-width: 768px) { .message-avatar { width: 40px; height: 40px; } }
+        .message.assistant .message-avatar { background: linear-gradient(135deg, #68d391, #38a169); color: white; margin-right: 10px; }
+        .message.user .message-avatar { background: linear-gradient(135deg, #63b3ed, #3182ce); color: white; margin-left: 10px; order: 2; }
+        .message-content { max-width: 80%; }
+        @media (min-width: 768px) { .message-content { max-width: 70%; } }
+        .message.user .message-content { order: 1; }
+        .message-bubble { padding: 10px 14px; border-radius: 12px; line-height: 1.6; white-space: pre-wrap; word-break: break-word; font-size: 14px; }
+        @media (min-width: 768px) { .message-bubble { padding: 12px 16px; font-size: 15px; } }
+        .message.assistant .message-bubble { background: white; border: 1px solid #e2e8f0; border-top-left-radius: 4px; }
+        .message.user .message-bubble { background: linear-gradient(135deg, #68d391, #38a169); color: white; border-top-right-radius: 4px; }
+        .message-time { font-size: 10px; color: #a0aec0; margin-top: 4px; }
+        @media (min-width: 768px) { .message-time { font-size: 11px; } }
+        .message.user .message-time { text-align: right; }
+        .herb-card, .formula-card { background: #f7fafc; border: 1px solid #e2e8f0; border-radius: 8px; padding: 10px; margin-top: 8px; }
+        .herb-card h4, .formula-card h4 { color: #2c5282; font-size: 13px; margin-bottom: 6px; display: flex; align-items: center; gap: 6px; }
+        @media (min-width: 768px) { .herb-card h4, .formula-card h4 { font-size: 14px; } }
+        .herb-card .card-grid, .formula-card .card-grid { display: grid; grid-template-columns: auto 1fr; gap: 3px 10px; font-size: 11px; }
+        @media (min-width: 768px) { .herb-card .card-grid, .formula-card .card-grid { font-size: 12px; gap: 4px 12px; } }
+        .herb-card .card-label, .formula-card .card-label { color: #718096; font-weight: 500; }
+        .herb-card .card-value, .formula-card .card-value { color: #2d3748; }
+        .warning-box { background: #fff5f5; border: 1px solid #feb2b2; border-left: 3px solid #e53e3e; border-radius: 4px; padding: 8px 10px; margin-top: 8px; font-size: 11px; color: #c53030; }
+        @media (min-width: 768px) { .warning-box { font-size: 12px; padding: 10px 12px; } }
+        .quick-questions { display: flex; flex-wrap: wrap; gap: 6px; margin-bottom: 12px; }
+        @media (min-width: 768px) { .quick-questions { gap: 8px; margin-bottom: 16px; } }
+        .quick-btn { padding: 6px 12px; background: white; border: 1px solid #e2e8f0; border-radius: 20px; font-size: 12px; color: #4a5568; cursor: pointer; transition: all 0.2s; }
+        @media (min-width: 768px) { .quick-btn { padding: 6px 14px; font-size: 13px; } }
+        .quick-btn:hover { background: #68d391; color: white; border-color: #68d391; }
+        .quick-btn:active { transform: scale(0.95); }
+        .chat-input-area { background: white; border-radius: 12px; padding: 10px; box-shadow: 0 -2px 10px rgba(0,0,0,0.05); display: flex; gap: 8px; align-items: flex-end; }
+        @media (min-width: 768px) { .chat-input-area { padding: 12px; gap: 10px; } }
+        .chat-input { flex: 1; border: 1px solid #e2e8f0; border-radius: 8px; padding: 10px 12px; font-size: 14px; resize: none; min-height: 40px; max-height: 100px; outline: none; transition: border-color 0.2s; }
+        @media (min-width: 768px) { .chat-input { min-height: 44px; max-height: 120px; padding: 10px 14px; } }
+        .chat-input:focus { border-color: #68d391; }
+        .send-btn { background: linear-gradient(135deg, #68d391, #38a169); color: white; border: none; border-radius: 8px; padding: 10px 16px; font-size: 14px; cursor: pointer; transition: all 0.2s; display: flex; align-items: center; gap: 4px; }
+        @media (min-width: 768px) { .send-btn { padding: 10px 20px; gap: 6px; } }
+        .send-btn:hover { transform: translateY(-1px); box-shadow: 0 4px 12px rgba(104,211,145,0.4); }
+        .send-btn:active { transform: scale(0.95); }
+        .send-btn:disabled { opacity: 0.5; cursor: not-allowed; transform: none; }
+        .typing-indicator { display: flex; gap: 4px; padding: 8px 0; }
+        .typing-dot { width: 7px; height: 7px; background: #a0aec0; border-radius: 50%; animation: typing 1.4s infinite; }
+        @media (min-width: 768px) { .typing-dot { width: 8px; height: 8px; } }
+        .typing-dot:nth-child(2) { animation-delay: 0.2s; }
+        .typing-dot:nth-child(3) { animation-delay: 0.4s; }
+        @keyframes typing { 0%, 60%, 100% { transform: translateY(0); } 30% { transform: translateY(-6px); } }
+        .role-badge { display: inline-block; padding: 2px 8px; border-radius: 10px; font-size: 10px; font-weight: 500; }
+        @media (min-width: 768px) { .role-badge { font-size: 11px; } }
+        .role-badge.doctor { background: #bee3f8; color: #2c5282; }
+        .role-badge.admin { background: #fefcbf; color: #975a16; }
+        .role-badge.patient { background: #c6f6d5; color: #276749; }
+        .welcome-box { text-align: center; padding: 30px 16px; }
+        @media (min-width: 768px) { .welcome-box { padding: 40px 20px; } }
+        .welcome-icon { width: 64px; height: 64px; border-radius: 50%; background: linear-gradient(135deg, #68d391, #38a169); display: flex; align-items: center; justify-content: center; margin: 0 auto 16px; font-size: 28px; color: white; }
+        @media (min-width: 768px) { .welcome-icon { width: 80px; height: 80px; font-size: 36px; margin-bottom: 20px; } }
+        .welcome-box h3 { font-size: 18px; color: #2d3748; margin-bottom: 6px; }
+        @media (min-width: 768px) { .welcome-box h3 { font-size: 20px; margin-bottom: 8px; } }
+        .welcome-box p { color: #718096; font-size: 13px; margin-bottom: 16px; }
+        @media (min-width: 768px) { .welcome-box p { font-size: 14px; margin-bottom: 20px; } }
+        .feature-grid { display: grid; grid-template-columns: repeat(2, 1fr); gap: 8px; max-width: 100%; margin: 0 auto; }
+        @media (min-width: 768px) { .feature-grid { gap: 12px; max-width: 500px; } }
+        .feature-item { background: white; border: 1px solid #e2e8f0; border-radius: 8px; padding: 12px; text-align: left; cursor: pointer; transition: all 0.2s; }
+        @media (min-width: 768px) { .feature-item { padding: 16px; } }
+        .feature-item:hover { border-color: #68d391; box-shadow: 0 2px 8px rgba(104,211,145,0.2); }
+        .feature-item:active { transform: scale(0.98); }
+        .feature-item i { color: #68d391; font-size: 18px; margin-bottom: 6px; }
+        @media (min-width: 768px) { .feature-item i { font-size: 20px; margin-bottom: 8px; } }
+        .feature-item h5 { font-size: 13px; color: #2d3748; margin-bottom: 2px; }
+        @media (min-width: 768px) { .feature-item h5 { font-size: 14px; margin-bottom: 4px; } }
+        .feature-item p { font-size: 11px; color: #a0aec0; margin: 0; }
+        @media (min-width: 768px) { .feature-item p { font-size: 12px; } }
+        /* 底部导航（移动端） */
+        .bottom-nav { display: flex; background: white; border-top: 1px solid #e2e8f0; padding: 8px 0; position: sticky; bottom: 0; z-index: 20; }
+        @media (min-width: 768px) { .bottom-nav { display: none; } }
+        .bottom-nav-item { flex: 1; display: flex; flex-direction: column; align-items: center; padding: 6px; color: #718096; font-size: 10px; cursor: pointer; text-decoration: none; }
+        .bottom-nav-item.active { color: #38a169; }
+        .bottom-nav-item i { font-size: 18px; margin-bottom: 2px; }
+        /* 模态框 */
+        .modal-overlay { display: none; position: fixed; inset: 0; background: rgba(0,0,0,0.5); z-index: 50; align-items: center; justify-content: center; padding: 16px; }
+        .modal-overlay.show { display: flex; }
+        .modal-content { background: white; border-radius: 12px; padding: 20px; width: 100%; max-width: 400px; max-height: 80vh; overflow-y: auto; }
+        .modal-content h3 { font-size: 16px; font-weight: 600; margin-bottom: 16px; color: #2d3748; }
+        .modal-close { float: right; background: none; border: none; font-size: 20px; color: #a0aec0; cursor: pointer; }
+        .health-item { display: flex; justify-content: space-between; padding: 10px 0; border-bottom: 1px solid #f0f0f0; font-size: 13px; }
+        .health-item:last-child { border-bottom: none; }
+        .health-label { color: #718096; }
+        .health-value { color: #2d3748; font-weight: 500; }
+        .symptom-tags { display: flex; flex-wrap: wrap; gap: 6px; margin-bottom: 12px; }
+        .symptom-tag { padding: 6px 12px; background: #f0fdf4; border: 1px solid #bbf7d0; border-radius: 16px; font-size: 12px; color: #166534; cursor: pointer; transition: all 0.2s; }
+        .symptom-tag.selected { background: #38a169; color: white; border-color: #38a169; }
+    </style>
+
+    <!-- PWA 支持 -->
+    <link rel="manifest" href="/manifest.json">
+    <meta name="theme-color" content="#1a365d">
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+    <meta name="apple-mobile-web-app-title" content="本草智管">
+    <link rel="apple-touch-icon" href="/icon-192x192.png">
+    <link rel="icon" type="image/x-icon" href="/favicon.ico">
+
+</head>
+<body>
+    <!-- 侧边栏遮罩 -->
+    <div class="sidebar-overlay" id="sidebar-overlay" onclick="toggleSidebar()"></div>
+
+    <!-- 侧边栏 -->
+    <div class="sidebar" id="sidebar">
+        <div class="sidebar-brand">
+            <h1><i class="fas fa-leaf"></i> 本草智管</h1>
+            <p>中医门诊药材库存管理系统</p>
+        </div>
+        <div id="nav-menu"></div>
+    </div>
+
+    <div class="main">
+        <!-- 顶部栏 -->
+        <div class="topbar">
+            <div style="display:flex;align-items:center;gap:8px;">
+                <button class="menu-btn" onclick="toggleSidebar()"><i class="fas fa-bars"></i></button>
+                <h2><i class="fas fa-robot" style="color:#68d391;"></i> 智能诊疗助手</h2>
+            </div>
+            <div class="user-info">
+                <span id="user-role-badge"></span>
+                <span id="user-name" style="font-size:13px;color:#4a5568;"></span>
+                <div class="user-avatar" id="user-avatar"></div>
+            </div>
+        </div>
+
+        <div class="chat-container">
+            <!-- 快捷问题 -->
+            <div class="quick-questions" id="quick-questions">
+                <button class="quick-btn" onclick="sendQuick('黄芪有什么功效')"><i class="fas fa-leaf"></i> 药材功效</button>
+                <button class="quick-btn" onclick="sendQuick('最近失眠怎么办')"><i class="fas fa-heartbeat"></i> 症状咨询</button>
+                <button class="quick-btn" onclick="sendQuick('四君子汤的组成')"><i class="fas fa-flask"></i> 方剂查询</button>
+                <button class="quick-btn" onclick="sendQuick('十八反是什么')"><i class="fas fa-exclamation-triangle"></i> 配伍禁忌</button>
+                <button class="quick-btn" onclick="showSymptomSelector()"><i class="fas fa-stethoscope"></i> 快捷诊断</button>
+                <button class="quick-btn" onclick="showHealthProfile()"><i class="fas fa-user-md"></i> 健康档案</button>
+            </div>
+
+            <!-- 聊天消息区 -->
+            <div class="chat-messages" id="chat-messages">
+                <div class="welcome-box" id="welcome-box">
+                    <div class="welcome-icon"><i class="fas fa-robot"></i></div>
+                    <h3>您好，我是智能诊疗助手</h3>
+                    <p id="welcome-desc">我可以为您提供药材查询、症状咨询、方剂推荐、配伍禁忌检查等服务</p>
+                    <div class="feature-grid" id="feature-grid"></div>
+                </div>
+            </div>
+
+            <!-- 输入区 -->
+            <div class="chat-input-area">
+                <textarea class="chat-input" id="chat-input" placeholder="请输入您的问题..." rows="1" onkeydown="handleKeyDown(event)"></textarea>
+                <button class="send-btn" id="send-btn" onclick="sendMessage()">
+                    <i class="fas fa-paper-plane"></i> <span class="hidden sm:inline">发送</span>
+                </button>
+            </div>
+        </div>
+
+        <!-- 移动端底部导航 -->
+        <div class="bottom-nav">
+            <a href="dashboard.html" class="bottom-nav-item"><i class="fas fa-home"></i>首页</a>
+            <a href="prescriptions.html" class="bottom-nav-item"><i class="fas fa-file-prescription"></i>处方</a>
+            <a href="assistant.html" class="bottom-nav-item active"><i class="fas fa-robot"></i>助手</a>
+            <a href="herbs.html" class="bottom-nav-item"><i class="fas fa-leaf"></i>药材</a>
+            <a href="data-board.html" class="bottom-nav-item"><i class="fas fa-chart-bar"></i>数据</a>
+        </div>
+    </div>
+
+    <!-- 健康档案模态框 -->
+    <div class="modal-overlay" id="health-modal">
+        <div class="modal-content">
+            <button class="modal-close" onclick="closeModal('health-modal')">&times;</button>
+            <h3><i class="fas fa-user-md" style="color:#38a169;"></i> 我的健康档案</h3>
+            <div id="health-profile-content"></div>
+        </div>
+    </div>
+
+    <!-- 快捷诊断模态框 -->
+    <div class="modal-overlay" id="symptom-modal">
+        <div class="modal-content">
+            <button class="modal-close" onclick="closeModal('symptom-modal')">&times;</button>
+            <h3><i class="fas fa-stethoscope" style="color:#38a169;"></i> 快捷症状咨询</h3>
+            <p style="font-size:13px;color:#718096;margin-bottom:12px;">选择您当前的不适症状（可多选）：</p>
+            <div class="symptom-tags" id="symptom-tags"></div>
+            <button class="send-btn" style="width:100%;justify-content:center;" onclick="submitSymptoms()">
+                <i class="fas fa-search"></i> 开始咨询
+            </button>
+        </div>
+    </div>
+
+    <script>
+        // 导航菜单配置
+        const navConfig = [
+            { section: "核心功能" },
+            { icon: "fa-tachometer-alt", label: "控制面板", url: "dashboard.html", roles: ["admin","doctor","patient"] },
+            { icon: "fa-file-prescription", label: "处方管理", url: "prescriptions.html", roles: ["admin","doctor","patient"] },
+            { icon: "fa-chart-bar", label: "数据看板", url: "data-board.html", roles: ["admin","doctor","patient"] },
+            { icon: "fa-robot", label: "智能助手", url: "assistant.html", roles: ["admin","doctor","patient"], active: true },
+            { section: "库存管理" },
+            { icon: "fa-boxes", label: "药材管理", url: "herbs.html", roles: ["admin","doctor"] },
+            { icon: "fa-truck-loading", label: "采购管理", url: "purchase.html", roles: ["admin","doctor"] },
+            { icon: "fa-bell", label: "库存预警/补货", url: "replenish.html", roles: ["admin","doctor"] },
+            { icon: "fa-exchange-alt", label: "库存流水", url: "stock-flow.html", roles: ["admin","doctor"] },
+            { section: "系统管理" },
+            { icon: "fa-users", label: "用户管理", url: "users.html", roles: ["admin"] },
+            { icon: "fa-history", label: "操作日志", url: "logs.html", roles: ["admin"] },
+            { icon: "fa-sign-out-alt", label: "退出登录", url: "index.html", roles: ["admin","doctor","patient"], action: "logout" },
+        ];
+
+        // 症状列表
+        const SYMPTOM_LIST = [
+            "感冒", "咳嗽", "失眠", "消化不良", "乏力", "月经不调",
+            "头晕", "出汗多", "便秘", "水肿", "焦虑抑郁", "咽喉痛",
+            "胃痛", "腹泻", "心悸", "腰酸", "耳鸣", "皮肤瘙痒"
+        ];
+        let selectedSymptoms = [];
+
+        let currentUser = null;
+
+        // 统一 API 请求
+        async function api(method, url, body) {
+            const opts = {
+                method: method,
+                headers: {
+                    'Content-Type': 'application/json',
+                    'X-User': sessionStorage.getItem('current_user') || ''
+                }
+            };
+            if (body !== undefined) opts.body = JSON.stringify(body);
+            const resp = await fetch(url, opts);
+            const result = await resp.json().catch(() => ({ code: -1, message: '服务器连接失败' }));
+            return result;
+        }
+
+        document.addEventListener('DOMContentLoaded', function() {
+            checkLogin();
+            renderNav();
+            loadChatHistory();
+            initSymptomTags();
+        });
+
+        function checkLogin() {
+            const username = sessionStorage.getItem('current_user');
+            const role = sessionStorage.getItem('current_role');
+            const name = sessionStorage.getItem('current_name') || username;
+            if (!username) {
+                window.location.href = 'index.html';
+                return;
+            }
+            currentUser = { username, role, name };
+            document.getElementById('user-name').textContent = name;
+            document.getElementById('user-avatar').textContent = name.charAt(0);
+
+            const roleMap = { admin: '管理员', doctor: '医生', patient: '患者' };
+            const badge = document.getElementById('user-role-badge');
+            badge.className = 'role-badge ' + role;
+            badge.textContent = roleMap[role] || role;
+
+            updateWelcomeByRole();
+        }
+
+        function updateWelcomeByRole() {
+            const desc = document.getElementById('welcome-desc');
+            const grid = document.getElementById('feature-grid');
+            const role = currentUser.role;
+
+            if (role === 'patient') {
+                desc.textContent = '我可以为您提供药材功效查询、健康咨询、用药指导、处方查询等服务';
+                grid.innerHTML = `
+                    <div class="feature-item" onclick="sendQuick('黄芪有什么功效')">
+                        <i class="fas fa-leaf"></i><h5>药材查询</h5><p>了解药材功效与用法</p>
+                    </div>
+                    <div class="feature-item" onclick="showSymptomSelector()">
+                        <i class="fas fa-heartbeat"></i><h5>症状咨询</h5><p>获取健康调理建议</p>
+                    </div>
+                    <div class="feature-item" onclick="sendQuick('我的处方')">
+                        <i class="fas fa-file-prescription"></i><h5>处方查询</h5><p>查看您的处方记录</p>
+                    </div>
+                    <div class="feature-item" onclick="showHealthProfile()">
+                        <i class="fas fa-user-md"></i><h5>健康档案</h5><p>查看个人健康信息</p>
+                    </div>
+                `;
+            } else {
+                desc.textContent = '我可以为您提供药材知识查询、方剂参考、配伍禁忌检查、处方辅助等临床工具';
+                grid.innerHTML = `
+                    <div class="feature-item" onclick="sendQuick('黄芪有什么功效')">
+                        <i class="fas fa-leaf"></i><h5>药材知识库</h5><p>性味归经功效主治</p>
+                    </div>
+                    <div class="feature-item" onclick="sendQuick('四君子汤的组成')">
+                        <i class="fas fa-flask"></i><h5>方剂库</h5><p>经典方剂组成用法</p>
+                    </div>
+                    <div class="feature-item" onclick="sendQuick('十八反是什么')">
+                        <i class="fas fa-exclamation-triangle"></i><h5>配伍禁忌</h5><p>十八反十九畏查询</p>
+                    </div>
+                    <div class="feature-item" onclick="showPrescriptionHelp()">
+                        <i class="fas fa-user-md"></i><h5>处方辅助</h5><p>根据诊断推荐用药</p>
+                    </div>
+                `;
+            }
+        }
+
+        function renderNav() {
+            const nav = document.getElementById('nav-menu');
+            let html = '';
+            const role = currentUser.role;
+            for (const item of navConfig) {
+                if (item.section) {
+                    html += `<div class="nav-section">${item.section}</div>`;
+                } else {
+                    if (item.roles && !item.roles.includes(role)) continue;
+                    const active = item.active ? 'active' : '';
+                    const click = item.action === 'logout' ? `onclick="logout()"` : `onclick="location.href='${item.url}'"`;
+                    html += `<div class="nav-item ${active}" ${click}><i class="fas ${item.icon}"></i>${item.label}</div>`;
+                }
+            }
+            nav.innerHTML = html;
+        }
+
+        function toggleSidebar() {
+            document.getElementById('sidebar').classList.toggle('open');
+            document.getElementById('sidebar-overlay').classList.toggle('show');
+        }
+
+        function logout() {
+            sessionStorage.removeItem('current_user');
+            sessionStorage.removeItem('current_role');
+            sessionStorage.removeItem('current_name');
+            window.location.href = 'index.html';
+        }
+
+        function handleKeyDown(e) {
+            if (e.key === 'Enter' && !e.shiftKey) {
+                e.preventDefault();
+                sendMessage();
+            }
+        }
+
+        function sendQuick(text) {
+            document.getElementById('chat-input').value = text;
+            sendMessage();
+        }
+
+        async function sendMessage() {
+            const input = document.getElementById('chat-input');
+            const message = input.value.trim();
+            if (!message) return;
+
+            document.getElementById('welcome-box').style.display = 'none';
+            addMessage('user', message);
+            input.value = '';
+            input.style.height = 'auto';
+
+            const typingId = showTyping();
+            document.getElementById('send-btn').disabled = true;
+
+            try {
+                const data = await api('POST', '/api/chat', { message });
+                removeTyping(typingId);
+
+                if (data.code === 0 || data.code === 200) {
+                    const replyData = data.data || data;
+                    addMessage('assistant', replyData.reply, replyData.cards, replyData.warnings);
+                } else {
+                    addMessage('assistant', '抱歉，处理您的问题时出现错误：' + (data.message || data.msg || '未知错误'));
+                }
+            } catch (err) {
+                removeTyping(typingId);
+                addMessage('assistant', '网络错误，请稍后重试。');
+            }
+            document.getElementById('send-btn').disabled = false;
+        }
+
+        function addMessage(role, text, cards = [], warnings = []) {
+            const container = document.getElementById('chat-messages');
+            const div = document.createElement('div');
+            div.className = `message ${role}`;
+
+            const time = new Date().toLocaleTimeString('zh-CN', { hour: '2-digit', minute: '2-digit' });
+            const avatarIcon = role === 'assistant' ? 'fa-robot' : 'fa-user';
+
+            let cardsHtml = '';
+            for (const card of cards) {
+                if (card.type === 'herb_card') {
+                    cardsHtml += `
+                        <div class="herb-card">
+                            <h4><i class="fas fa-leaf" style="color:#68d391;"></i>${card.name} <span style="font-size:10px;color:#a0aec0;font-weight:normal;">${card.category || ''}</span></h4>
+                            <div class="card-grid">
+                                <span class="card-label">性味</span><span class="card-value">${card.nature || ''}，${card.flavor || ''}</span>
+                                <span class="card-label">归经</span><span class="card-value">${card.meridian || ''}</span>
+                                <span class="card-label">功效</span><span class="card-value">${card.effects || ''}</span>
+                                <span class="card-label">主治</span><span class="card-value">${card.indications || ''}</span>
+                                <span class="card-label">用量</span><span class="card-value">${card.dosage || ''}</span>
+                                <span class="card-label">用法</span><span class="card-value">${card.usage || ''}</span>
+                            </div>
+                        </div>
+                    `;
+                } else if (card.type === 'formula_card') {
+                    cardsHtml += `
+                        <div class="formula-card">
+                            <h4><i class="fas fa-flask" style="color:#63b3ed;"></i>${card.name} <span style="font-size:10px;color:#a0aec0;font-weight:normal;">${card.category || ''}</span></h4>
+                            <div class="card-grid">
+                                <span class="card-label">出处</span><span class="card-value">${card.source || ''}</span>
+                                <span class="card-label">组成</span><span class="card-value">${card.composition || ''}</span>
+                                <span class="card-label">功效</span><span class="card-value">${card.effects || ''}</span>
+                                <span class="card-label">主治</span><span class="card-value">${card.indications || ''}</span>
+                                <span class="card-label">用法</span><span class="card-value">${card.usage || ''}</span>
+                            </div>
+                        </div>
+                    `;
+                }
+            }
+
+            let warningsHtml = '';
+            for (const w of warnings) {
+                warningsHtml += `<div class="warning-box"><i class="fas fa-exclamation-circle"></i> ${w}</div>`;
+            }
+
+            div.innerHTML = `
+                <div class="message-avatar"><i class="fas ${avatarIcon}"></i></div>
+                <div class="message-content">
+                    <div class="message-bubble">${text}${cardsHtml}${warningsHtml}</div>
+                    <div class="message-time">${time}</div>
+                </div>
+            `;
+            container.appendChild(div);
+            container.scrollTop = container.scrollHeight;
+        }
+
+        function showTyping() {
+            const container = document.getElementById('chat-messages');
+            const id = 'typing-' + Date.now();
+            const div = document.createElement('div');
+            div.id = id;
+            div.className = 'message assistant';
+            div.innerHTML = `
+                <div class="message-avatar"><i class="fas fa-robot"></i></div>
+                <div class="message-content">
+                    <div class="message-bubble">
+                        <div class="typing-indicator">
+                            <div class="typing-dot"></div>
+                            <div class="typing-dot"></div>
+                            <div class="typing-dot"></div>
+                        </div>
+                    </div>
+                </div>
+            `;
+            container.appendChild(div);
+            container.scrollTop = container.scrollHeight;
+            return id;
+        }
+
+        function removeTyping(id) {
+            const el = document.getElementById(id);
+            if (el) el.remove();
+        }
+
+        async function loadChatHistory() {
+            try {
+                const data = await api('GET', '/api/chat/history?limit=10');
+                if ((data.code === 0 || data.code === 200) && data.data && data.data.items.length > 0) {
+                    document.getElementById('welcome-box').style.display = 'none';
+                    const items = data.data.items.reverse();
+                    for (const item of items) {
+                        addMessage('user', item.user_message);
+                        addMessage('assistant', item.assistant_reply);
+                    }
+                }
+            } catch (err) {}
+        }
+
+        // 健康档案
+        async function showHealthProfile() {
+            const content = document.getElementById('health-profile-content');
+            content.innerHTML = '<p style="text-align:center;color:#a0aec0;padding:20px;">加载中...</p>';
+            document.getElementById('health-modal').classList.add('show');
+
+            try {
+                // 获取用户信息
+                const userData = await api('GET', '/api/users');
+                let userInfo = null;
+                if (userData.code === 0 && userData.data) {
+                    userInfo = userData.data.find(u => u.username === currentUser.username);
+                }
+
+                // 获取患者处方
+                const rxData = await api('GET', '/api/prescriptions');
+                let prescriptions = [];
+                if (rxData.code === 0 && rxData.data) {
+                    prescriptions = rxData.data.filter(p =>
+                        p.patientName === currentUser.name || p.patientPhone === (userInfo?.phone || '')
+                    );
+                }
+
+                let html = '';
+                if (userInfo) {
+                    html += `
+                        <div class="health-item"><span class="health-label">姓名</span><span class="health-value">${userInfo.name || '-'}</span></div>
+                        <div class="health-item"><span class="health-label">性别</span><span class="health-value">${userInfo.gender || '-'}</span></div>
+                        <div class="health-item"><span class="health-label">年龄</span><span class="health-value">${userInfo.age ? userInfo.age + '岁' : '-'}</span></div>
+                        <div class="health-item"><span class="health-label">联系电话</span><span class="health-value">${userInfo.phone || '-'}</span></div>
+                        <div class="health-item"><span class="health-label">账号类型</span><span class="health-value">${userInfo.role === 'patient' ? '患者' : userInfo.role === 'doctor' ? '医生' : '管理员'}</span></div>
+                    `;
+                }
+
+                html += `<div style="margin-top:16px;padding-top:12px;border-top:1px solid #e2e8f0;">
+                    <h4 style="font-size:14px;margin-bottom:8px;color:#2d3748;"><i class="fas fa-file-prescription" style="color:#38a169;"></i> 历史处方（${prescriptions.length}）</h4>`;
+
+                if (prescriptions.length > 0) {
+                    prescriptions.slice(0, 5).forEach(p => {
+                        const statusMap = { pending: '待审核', approved: '已审核', rejected: '已驳回', dispensed: '已发药' };
+                        html += `
+                            <div class="health-item">
+                                <span class="health-label">${p.prescriptionNo || ''}</span>
+                                <span class="health-value">${statusMap[p.status] || p.status}</span>
+                            </div>
+                            <div style="font-size:11px;color:#a0aec0;padding-left:4px;margin-bottom:4px;">${p.diagnosis || ''} | ${p.doctorName || ''}</div>
+                        `;
+                    });
+                } else {
+                    html += '<p style="font-size:12px;color:#a0aec0;">暂无处方记录</p>';
+                }
+                html += '</div>';
+
+                content.innerHTML = html;
+            } catch (err) {
+                content.innerHTML = '<p style="text-align:center;color:#e53e3e;padding:20px;">加载失败，请稍后重试</p>';
+            }
+        }
+
+        // 快捷症状选择
+        function initSymptomTags() {
+            const container = document.getElementById('symptom-tags');
+            container.innerHTML = SYMPTOM_LIST.map(s =>
+                `<span class="symptom-tag" onclick="toggleSymptom(this,'${s}')">${s}</span>`
+            ).join('');
+        }
+
+        function toggleSymptom(el, symptom) {
+            el.classList.toggle('selected');
+            if (selectedSymptoms.includes(symptom)) {
+                selectedSymptoms = selectedSymptoms.filter(s => s !== symptom);
+            } else {
+                selectedSymptoms.push(symptom);
+            }
+        }
+
+        function submitSymptoms() {
+            if (selectedSymptoms.length === 0) {
+                alert('请至少选择一个症状');
+                return;
+            }
+            closeModal('symptom-modal');
+            const msg = `我最近有${selectedSymptoms.join('、')}的症状，应该怎么调理？`;
+            document.getElementById('welcome-box').style.display = 'none';
+            addMessage('user', msg);
+            sendQuick(msg);
+            selectedSymptoms = [];
+            document.querySelectorAll('.symptom-tag').forEach(t => t.classList.remove('selected'));
+        }
+
+        function closeModal(id) {
+            document.getElementById(id).classList.remove('show');
+        }
+
+        // 处方辅助（医护端）
+        function showPrescriptionHelp() {
+            const diagnosis = prompt('请输入诊断信息（如：气血两虚证、肝郁脾虚证等）：');
+            if (!diagnosis) return;
+            document.getElementById('welcome-box').style.display = 'none';
+            addMessage('user', `【处方辅助请求】\n诊断：${diagnosis}`);
+            sendPrescriptionHelp(diagnosis);
+        }
+
+        async function sendPrescriptionHelp(diagnosis) {
+            const typingId = showTyping();
+            document.getElementById('send-btn').disabled = true;
+
+            try {
+                const data = await api('POST', '/api/assistant/prescription-help', { diagnosis });
+                removeTyping(typingId);
+
+                if (data.code === 0 || data.code === 200) {
+                    const d = data.data;
+                    let reply = `【处方辅助分析】\n\n诊断：${d.diagnosis}\n\n`;
+
+                    if (d.suggestedHerbs && d.suggestedHerbs.length > 0) {
+                        reply += `【推荐药材】\n`;
+                        for (const h of d.suggestedHerbs) {
+                            reply += `• ${h.name}（${h.dosage}）- ${h.effects}\n`;
+                        }
+                        reply += '\n';
+                    }
+
+                    if (d.suggestedFormulas && d.suggestedFormulas.length > 0) {
+                        reply += `【参考方剂】\n`;
+                        for (const f of d.suggestedFormulas) {
+                            reply += `• ${f.name}：${f.effects}\n`;
+                        }
+                        reply += '\n';
+                    }
+
+                    if (d.compatibilityWarnings && d.compatibilityWarnings.length > 0) {
+                        reply += `⚠️ 【配伍禁忌提醒】\n`;
+                        for (const w of d.compatibilityWarnings) {
+                            reply += `• ${w.warning}\n`;
+                        }
+                        reply += '\n';
+                    }
+
+                    reply += `【备注】\n`;
+                    for (const n of d.notes || []) {
+                        reply += `• ${n}\n`;
+                    }
+
+                    addMessage('assistant', reply, d.suggestedFormulas, (d.compatibilityWarnings || []).map(w => w.warning));
+                } else {
+                    addMessage('assistant', '处方辅助失败：' + (data.message || data.msg || '未知错误'));
+                }
+            } catch (err) {
+                removeTyping(typingId);
+                addMessage('assistant', '网络错误，请稍后重试。');
+            }
+            document.getElementById('send-btn').disabled = false;
+        }
+
+        // 输入框自动高度
+        document.getElementById('chat-input').addEventListener('input', function() {
+            this.style.height = 'auto';
+            this.style.height = Math.min(this.scrollHeight, 100) + 'px';
+        });
+
+        // 点击模态框外部关闭
+        document.querySelectorAll('.modal-overlay').forEach(modal => {
+            modal.addEventListener('click', function(e) {
+                if (e.target === this) this.classList.remove('show');
+            });
+        });
+    </script>
+
+    <!-- PWA Service Worker 注册 -->
+    <script>
+    if ('serviceWorker' in navigator) {
+        window.addEventListener('load', function() {
+            navigator.serviceWorker.register('/sw.js')
+                .then(function(registration) {
+                    console.log('PWA: Service Worker 注册成功，范围:', registration.scope);
+                    
+                    // 监听更新
+                    registration.addEventListener('updatefound', function() {
+                        const newWorker = registration.installing;
+                        newWorker.addEventListener('statechange', function() {
+                            if (newWorker.state === 'installed' && navigator.serviceWorker.controller) {
+                                // 显示更新提示
+                                if (confirm('发现新版本，是否立即更新？')) {
+                                    newWorker.postMessage('SKIP_WAITING');
+                                    location.reload();
+                                }
+                            }
+                        });
+                    });
+                })
+                .catch(function(error) {
+                    console.log('PWA: Service Worker 注册失败:', error);
+                });
+        });
+    }
+    
+    // PWA 安装提示
+    let deferredPrompt;
+    window.addEventListener('beforeinstallprompt', function(e) {
+        e.preventDefault();
+        deferredPrompt = e;
+        console.log('PWA: 可以安装应用');
+        
+        // 显示安装按钮（如果有安装按钮元素）
+        const installBtn = document.getElementById('pwa-install-btn');
+        if (installBtn) {
+            installBtn.style.display = 'flex';
+            installBtn.addEventListener('click', function() {
+                if (deferredPrompt) {
+                    deferredPrompt.prompt();
+                    deferredPrompt.userChoice.then(function(choiceResult) {
+                        if (choiceResult.outcome === 'accepted') {
+                            console.log('PWA: 用户接受安装');
+                        }
+                        deferredPrompt = null;
+                        installBtn.style.display = 'none';
+                    });
+                }
+            });
+        }
+    });
+    
+    window.addEventListener('appinstalled', function() {
+        console.log('PWA: 应用已安装');
+        const installBtn = document.getElementById('pwa-install-btn');
+        if (installBtn) {
+            installBtn.style.display = 'none';
+        }
+    });
+    </script>
+
+</body>
+</html>

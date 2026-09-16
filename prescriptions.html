@@ -1,0 +1,788 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>处方管理 - 本草智管平台</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
+        body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", "PingFang SC", "Microsoft YaHei", sans-serif; background: #f5f7fa; }
+        .sidebar { width: 240px; background: linear-gradient(180deg, #1a365d 0%, #2c5282 100%); min-height: 100vh; position: fixed; left: 0; top: 0; color: white; overflow-y: auto; z-index: 40; transform: translateX(-100%); transition: transform 0.3s ease; }
+        .sidebar.open { transform: translateX(0); }
+        @media (min-width: 768px) { .sidebar { transform: translateX(0); position: fixed; } }
+        .sidebar-overlay { display: none; position: fixed; inset: 0; background: rgba(0,0,0,0.5); z-index: 35; }
+        .sidebar-overlay.show { display: block; }
+        .sidebar-brand { padding: 20px; text-align: center; border-bottom: 1px solid rgba(255,255,255,0.1); }
+        .sidebar-brand h1 { font-size: 18px; font-weight: 600; }
+        .sidebar-brand p { font-size: 12px; opacity: 0.7; margin-top: 4px; }
+        .nav-item { display: flex; align-items: center; padding: 12px 20px; color: rgba(255,255,255,0.8); text-decoration: none; transition: all 0.2s; cursor: pointer; }
+        .nav-item:hover { background: rgba(255,255,255,0.1); color: white; }
+        .nav-item.active { background: rgba(255,255,255,0.15); color: white; border-left: 3px solid #68d391; }
+        .nav-item i { width: 20px; margin-right: 12px; }
+        .nav-section { padding: 16px 20px 8px; font-size: 11px; text-transform: uppercase; opacity: 0.5; letter-spacing: 1px; }
+        .main { margin-left: 0; min-height: 100vh; display: flex; flex-direction: column; }
+        @media (min-width: 768px) { .main { margin-left: 240px; } }
+        .topbar { background: white; padding: 12px 16px; display: flex; justify-content: space-between; align-items: center; box-shadow: 0 1px 3px rgba(0,0,0,0.05); position: sticky; top: 0; z-index: 30; }
+        @media (min-width: 768px) { .topbar { padding: 12px 24px; } }
+        .topbar h2 { font-size: 16px; font-weight: 600; color: #2d3748; display: flex; align-items: center; gap: 8px; }
+        @media (min-width: 768px) { .topbar h2 { font-size: 18px; } }
+        .menu-btn { background: none; border: none; font-size: 20px; color: #2d3748; cursor: pointer; padding: 4px 8px; }
+        @media (min-width: 768px) { .menu-btn { display: none; } }
+        .user-info { display: flex; align-items: center; gap: 8px; }
+        @media (min-width: 768px) { .user-info { gap: 12px; } }
+        .user-avatar { width: 32px; height: 32px; border-radius: 50%; background: linear-gradient(135deg, #68d391, #38a169); display: flex; align-items: center; justify-content: center; color: white; font-weight: 600; font-size: 14px; }
+        @media (min-width: 768px) { .user-avatar { width: 36px; height: 36px; } }
+        .role-badge { display: inline-block; padding: 2px 8px; border-radius: 10px; font-size: 10px; font-weight: 500; }
+        @media (min-width: 768px) { .role-badge { font-size: 11px; } }
+        .role-badge.doctor { background: #bee3f8; color: #2c5282; }
+        .role-badge.admin { background: #fefcbf; color: #975a16; }
+        .role-badge.patient { background: #c6f6d5; color: #276749; }
+        .content { flex: 1; padding: 16px; }
+        @media (min-width: 768px) { .content { padding: 24px; } }
+    </style>
+
+
+    <!-- PWA 支持 -->
+    <link rel="manifest" href="/manifest.json">
+    <meta name="theme-color" content="#1a365d">
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+    <meta name="apple-mobile-web-app-title" content="本草智管">
+    <link rel="apple-touch-icon" href="/icon-192x192.png">
+    <link rel="icon" type="image/x-icon" href="/favicon.ico">
+
+</head>
+<body>
+    <div class="sidebar-overlay" id="sidebar-overlay" onclick="toggleSidebar()"></div>
+    <div class="sidebar" id="sidebar">
+
+        <div class="sidebar-brand">
+          <h1><i class="fas fa-leaf"></i> 本草智管</h1>
+          <p>中医门诊药材库存管理系统</p>
+        </div>
+        <div id="nav-menu">
+          <div class="nav-section">核心功能</div>
+          <div class="nav-item" onclick="location.href='dashboard.html'"><i class="fas fa-tachometer-alt"></i>控制面板</div>
+          <div class="nav-item" onclick="location.href='prescriptions.html'"><i class="fas fa-file-prescription"></i>处方管理</div>
+          <div class="nav-item" onclick="location.href='data-board.html'"><i class="fas fa-chart-bar"></i>数据看板</div>
+          <div class="nav-item" onclick="location.href='assistant.html'"><i class="fas fa-robot"></i>智能助手</div>
+          <div class="nav-section">库存管理</div>
+          <div class="nav-item" onclick="location.href='herbs.html'"><i class="fas fa-boxes"></i>药材管理</div>
+          <div class="nav-item" onclick="location.href='purchase.html'"><i class="fas fa-truck-loading"></i>采购管理</div>
+          <div class="nav-item" onclick="location.href='replenish.html'"><i class="fas fa-bell"></i>库存预警/补货</div>
+          <div class="nav-item" onclick="location.href='stock-flow.html'"><i class="fas fa-exchange-alt"></i>库存流水</div>
+          <div class="nav-section">系统管理</div>
+          <div class="nav-item" onclick="location.href='users.html'"><i class="fas fa-users"></i>用户管理</div>
+          <div class="nav-item" onclick="location.href='logs.html'"><i class="fas fa-history"></i>操作日志</div>
+          <div class="nav-item" onclick="logout()"><i class="fas fa-sign-out-alt"></i>退出登录</div>
+        </div>
+
+    </div>
+
+    <div class="main">
+        <div class="topbar">
+            <div style="display:flex;align-items:center;gap:8px;">
+                <button class="menu-btn" onclick="toggleSidebar()"><i class="fas fa-bars"></i></button>
+                <h2><i class="fas fa-file-prescription" style="color:#68d391;"></i> 处方管理</h2>
+            </div>
+            <div class="user-info">
+                <span id="topbar-role-badge" class="role-badge"></span>
+                <span id="topbar-username" style="font-size:13px;color:#4a5568;"></span>
+                <div class="user-avatar" id="topbar-avatar"></div>
+            </div>
+        </div>
+
+        <!-- 兼容层：旧布局元素的隐藏占位，防止原JS报错 -->
+        <div style="display:none;">
+            <button id="sidebar-toggle"></button>
+            <span id="welcome-message"></span>
+            <p id="sidebar-username"></p>
+            <p id="sidebar-role"></p>
+            <button id="logout-btn" onclick="logout()"></button>
+            <nav id="sidebar-nav"></nav>
+        </div>
+
+        <div class="content">
+<div class="space-y-6">
+        <!-- 标题栏 -->
+        <div class="flex items-center justify-between">
+          <div>
+            <h2 class="text-2xl font-bold text-gray-800">处方管理</h2>
+            <p class="text-gray-500 mt-1">中医处方开具、审核与发药管理</p>
+          </div>
+          <button id="btn-new-rx" class="px-4 py-2 bg-primary text-white rounded-lg font-medium hover:bg-green-700 transition-colors flex items-center">
+            <i class="fa fa-plus mr-2"></i> 新建处方
+          </button>
+        </div>
+
+        <!-- 统计卡片 -->
+        <div class="grid grid-cols-2 md:grid-cols-5 gap-4">
+          <div class="bg-white rounded-xl p-4 shadow-md">
+            <p class="text-xs text-gray-500">处方总数</p>
+            <p class="text-2xl font-bold text-gray-800 mt-1" id="stat-total">0</p>
+          </div>
+          <div class="bg-white rounded-xl p-4 shadow-md">
+            <p class="text-xs text-gray-500">待审核</p>
+            <p class="text-2xl font-bold text-yellow-600 mt-1" id="stat-pending">0</p>
+          </div>
+          <div class="bg-white rounded-xl p-4 shadow-md">
+            <p class="text-xs text-gray-500">已审核</p>
+            <p class="text-2xl font-bold text-green-600 mt-1" id="stat-approved">0</p>
+          </div>
+          <div class="bg-white rounded-xl p-4 shadow-md">
+            <p class="text-xs text-gray-500">已发药</p>
+            <p class="text-2xl font-bold text-blue-600 mt-1" id="stat-dispensed">0</p>
+          </div>
+          <div class="bg-white rounded-xl p-4 shadow-md">
+            <p class="text-xs text-gray-500">已拒绝</p>
+            <p class="text-2xl font-bold text-red-600 mt-1" id="stat-rejected">0</p>
+          </div>
+        </div>
+
+        <!-- 筛选栏 -->
+        <div class="bg-white rounded-xl p-4 shadow-md">
+          <div class="flex flex-wrap items-center gap-4">
+            <div class="flex items-center gap-2">
+              <span class="text-sm text-gray-600">状态：</span>
+              <div class="flex gap-1" id="status-tabs">
+                <button class="tab-btn active" data-status="">全部</button>
+                <button class="tab-btn" data-status="pending">待审核</button>
+                <button class="tab-btn" data-status="approved">已审核</button>
+                <button class="tab-btn" data-status="dispensed">已发药</button>
+                <button class="tab-btn" data-status="rejected">已拒绝</button>
+              </div>
+            </div>
+            <div class="flex-1 min-w-[200px]">
+              <input type="text" id="search-input" placeholder="搜索患者姓名/处方编号/诊断..."
+                class="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:border-primary focus:ring-1 focus:ring-primary">
+            </div>
+            <button id="btn-search" class="px-4 py-2 bg-gray-100 text-gray-700 rounded-lg text-sm hover:bg-gray-200 transition-colors">
+              <i class="fa fa-search mr-1"></i> 搜索
+            </button>
+          </div>
+        </div>
+
+        <!-- 处方列表 -->
+        <div class="bg-white rounded-xl shadow-md overflow-hidden">
+          <div class="overflow-x-auto">
+            <table class="w-full">
+              <thead class="bg-gray-50 border-b">
+                <tr>
+                  <th class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">处方编号</th>
+                  <th class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">患者</th>
+                  <th class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">开方医生</th>
+                  <th class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">诊断</th>
+                  <th class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">药味数</th>
+                  <th class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">金额</th>
+                  <th class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">状态</th>
+                  <th class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">创建时间</th>
+                  <th class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">操作</th>
+                </tr>
+              </thead>
+              <tbody id="rx-table-body" class="divide-y divide-gray-100">
+              </tbody>
+            </table>
+          </div>
+          <div id="empty-state" class="hidden py-12 text-center text-gray-400">
+            <i class="fa fa-file-text-o text-4xl mb-3"></i>
+            <p>暂无处方记录</p>
+          </div>
+        </div>
+      </div>
+    </main>
+  </div>
+
+  <!-- 新建/编辑处方弹窗 -->
+  <div id="rx-modal" class="modal-overlay hidden">
+    <div class="modal-content max-w-4xl p-6">
+      <div class="flex justify-between items-center mb-4">
+        <h3 class="text-xl font-bold text-gray-800" id="rx-modal-title">新建处方</h3>
+        <button id="rx-modal-close" class="text-gray-400 hover:text-gray-600"><i class="fa fa-times text-xl"></i></button>
+      </div>
+
+      <!-- 患者信息 -->
+      <div class="grid grid-cols-2 md:grid-cols-4 gap-4 mb-4">
+        <div>
+          <label class="block text-sm font-medium text-gray-700 mb-1">患者姓名 *</label>
+          <input type="text" id="rx-patient-name" class="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:border-primary">
+        </div>
+        <div>
+          <label class="block text-sm font-medium text-gray-700 mb-1">联系电话</label>
+          <input type="text" id="rx-patient-phone" class="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:border-primary">
+        </div>
+        <div>
+          <label class="block text-sm font-medium text-gray-700 mb-1">性别</label>
+          <select id="rx-patient-gender" class="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:border-primary">
+            <option value="">请选择</option>
+            <option value="男">男</option>
+            <option value="女">女</option>
+          </select>
+        </div>
+        <div>
+          <label class="block text-sm font-medium text-gray-700 mb-1">年龄</label>
+          <input type="number" id="rx-patient-age" class="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:border-primary">
+        </div>
+      </div>
+
+      <div class="grid grid-cols-1 md:grid-cols-2 gap-4 mb-4">
+        <div>
+          <label class="block text-sm font-medium text-gray-700 mb-1">科室</label>
+          <input type="text" id="rx-department" class="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:border-primary" placeholder="如：中医内科">
+        </div>
+        <div>
+          <label class="block text-sm font-medium text-gray-700 mb-1">诊断 *</label>
+          <input type="text" id="rx-diagnosis" class="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:border-primary" placeholder="如：气血两虚证">
+        </div>
+      </div>
+
+      <div class="mb-4">
+        <label class="block text-sm font-medium text-gray-700 mb-1">医嘱</label>
+        <textarea id="rx-advice" rows="2" class="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:border-primary" placeholder="如：水煎服，每日一剂，分两次温服"></textarea>
+      </div>
+
+      <!-- 药材明细 -->
+      <div class="mb-4">
+        <div class="flex justify-between items-center mb-2">
+          <label class="block text-sm font-medium text-gray-700">药材明细 *</label>
+          <button id="btn-add-herb-item" class="text-sm text-primary hover:text-green-700 font-medium">
+            <i class="fa fa-plus-circle mr-1"></i> 添加药材
+          </button>
+        </div>
+        <div class="border border-gray-200 rounded-lg overflow-hidden">
+          <table class="w-full text-sm">
+            <thead class="bg-gray-50">
+              <tr>
+                <th class="px-3 py-2 text-left text-xs font-medium text-gray-500">药材</th>
+                <th class="px-3 py-2 text-left text-xs font-medium text-gray-500" style="width:100px">剂量</th>
+                <th class="px-3 py-2 text-left text-xs font-medium text-gray-500" style="width:100px">剂数</th>
+                <th class="px-3 py-2 text-left text-xs font-medium text-gray-500" style="width:120px">用法</th>
+                <th class="px-3 py-2 text-left text-xs font-medium text-gray-500" style="width:80px">单价</th>
+                <th class="px-3 py-2 text-left text-xs font-medium text-gray-500" style="width:80px">小计</th>
+                <th class="px-3 py-2 text-center text-xs font-medium text-gray-500" style="width:50px">操作</th>
+              </tr>
+            </thead>
+            <tbody id="herb-items-body"></tbody>
+          </table>
+        </div>
+        <div class="flex justify-end mt-2 text-sm">
+          <span class="text-gray-600">合计：</span>
+          <span class="font-bold text-primary ml-2" id="rx-total-amount">¥0.00</span>
+        </div>
+      </div>
+
+      <div class="flex justify-end gap-3">
+        <button id="rx-modal-cancel" class="px-4 py-2 border border-gray-300 rounded-lg text-sm font-medium hover:bg-gray-50">取消</button>
+        <button id="rx-modal-save" class="px-4 py-2 bg-primary text-white rounded-lg text-sm font-medium hover:bg-green-700">
+          <i class="fa fa-save mr-1"></i> 提交处方
+        </button>
+      </div>
+    </div>
+  </div>
+
+  <!-- 处方详情弹窗 -->
+  <div id="detail-modal" class="modal-overlay hidden">
+    <div class="modal-content max-w-3xl p-6">
+      <div class="flex justify-between items-center mb-4">
+        <h3 class="text-xl font-bold text-gray-800">处方详情</h3>
+        <button id="detail-modal-close" class="text-gray-400 hover:text-gray-600"><i class="fa fa-times text-xl"></i></button>
+      </div>
+      <div id="detail-content"></div>
+    </div>
+  </div>
+
+  <!-- 审核弹窗 -->
+  <div id="audit-modal" class="modal-overlay hidden">
+    <div class="modal-content max-w-md p-6">
+      <h3 class="text-xl font-bold text-gray-800 mb-4">处方审核</h3>
+      <p class="text-sm text-gray-600 mb-3" id="audit-rx-info"></p>
+      <div class="mb-4">
+        <label class="block text-sm font-medium text-gray-700 mb-1">审核备注</label>
+        <textarea id="audit-remark" rows="3" class="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:border-primary" placeholder="请输入审核意见（可选）"></textarea>
+      </div>
+      <div class="flex justify-center gap-4">
+        <button id="audit-reject" class="px-6 py-2 bg-red-500 text-white rounded-lg font-medium hover:bg-red-600">
+          <i class="fa fa-times mr-1"></i> 拒绝
+        </button>
+        <button id="audit-approve" class="px-6 py-2 bg-primary text-white rounded-lg font-medium hover:bg-green-700">
+          <i class="fa fa-check mr-1"></i> 通过
+        </button>
+      </div>
+    </div>
+        </div>
+    </div>
+
+    <script>
+
+    // ===== 统一布局工具函数 =====
+    function toggleSidebar() {
+      document.getElementById('sidebar').classList.toggle('open');
+      document.getElementById('sidebar-overlay').classList.toggle('show');
+    }
+    function logout() {
+      sessionStorage.removeItem('current_user');
+      sessionStorage.removeItem('current_role');
+      sessionStorage.removeItem('current_name');
+      window.location.href = 'index.html';
+    }
+    function initUnifiedLayout(pageName) {
+      const currentUser = sessionStorage.getItem('current_user');
+      const currentRole = sessionStorage.getItem('current_role');
+      const currentName = sessionStorage.getItem('current_name') || currentUser;
+      if (!currentUser) { window.location.href = 'index.html'; return; }
+      const roleText = { admin: '管理员', doctor: '医生', patient: '患者' };
+      const userNameEl = document.getElementById('topbar-username');
+      const userAvatarEl = document.getElementById('topbar-avatar');
+      const roleBadgeEl = document.getElementById('topbar-role-badge');
+      if (userNameEl) userNameEl.textContent = currentName;
+      if (userAvatarEl) userAvatarEl.textContent = currentName.charAt(0);
+      if (roleBadgeEl) {
+        roleBadgeEl.className = 'role-badge ' + currentRole;
+        roleBadgeEl.textContent = roleText[currentRole] || currentRole;
+      }
+      document.querySelectorAll('.nav-item').forEach(item => {
+        if (item.textContent.includes(pageName)) item.classList.add('active');
+      });
+      const rolePermissions = {
+        patient: ['控制面板', '处方管理', '数据看板', '智能助手', '退出登录'],
+        doctor: ['控制面板', '处方管理', '数据看板', '药材管理', '智能助手', '采购管理', '库存预警/补货', '库存流水', '退出登录'],
+        admin: ['控制面板', '处方管理', '数据看板', '药材管理', '智能助手', '采购管理', '库存预警/补货', '库存流水', '用户管理', '操作日志', '退出登录'],
+      };
+      const allowed = rolePermissions[currentRole] || [];
+      document.querySelectorAll('.nav-item').forEach(item => {
+        const text = item.textContent.trim();
+        if (!allowed.some(a => text.includes(a))) item.style.display = 'none';
+      });
+    }
+
+
+// ===== 原页面业务逻辑 =====
+tailwind.config = {
+      theme: {
+        extend: {
+          colors: {
+            primary: '#2E7D32',
+            secondary: '#8D6E63',
+            accent: '#D32F2F',
+            neutral: '#F5F5F5',
+          }
+        }
+      }
+    }
+
+const API_BASE = '';
+    let currentUser = null, currentRole = null, currentName = null;
+    let allHerbs = [];
+    let currentStatusFilter = '';
+    let currentAuditRxId = null;
+
+    async function api(method, url, body) {
+      const opts = { method, headers: { 'Content-Type': 'application/json', 'X-User': sessionStorage.getItem('current_user') || '' } };
+      if (body !== undefined) opts.body = JSON.stringify(body);
+      const resp = await fetch(API_BASE + url, opts);
+      const result = await resp.json().catch(() => ({ code: -1, message: '服务器连接失败' }));
+      if (result.code !== 0) { alert(result.message); throw new Error(result.message); }
+      return result.data;
+    }
+
+    const STATUS_TEXT = { pending: '待审核', approved: '已审核', rejected: '已拒绝', dispensed: '已发药' };
+    const STATUS_CLASS = { pending: 'status-pending', approved: 'status-approved', rejected: 'status-rejected', dispensed: 'status-dispensed' };
+
+    document.addEventListener('DOMContentLoaded', async () => {
+      currentUser = sessionStorage.getItem('current_user');
+      currentRole = sessionStorage.getItem('current_role');
+      currentName = sessionStorage.getItem('current_name') || currentUser;
+      if (!currentUser) window.location.href = 'index.html';
+
+      const roleText = { admin: '管理员', doctor: '医生', patient: '病人' };
+      document.getElementById('welcome-message').textContent = `欢迎，${currentName}`;
+      document.getElementById('sidebar-username').textContent = currentName;
+      document.getElementById('sidebar-role').textContent = roleText[currentRole] || '用户';
+
+      document.querySelectorAll('#sidebar-nav > a[data-role]').forEach(item => {
+        if (!item.dataset.role.split(',').includes(currentRole)) item.classList.add('hidden');
+      });
+
+      // 病人和非医生不能新建处方
+      if (currentRole === 'patient') {
+        document.getElementById('btn-new-rx').classList.add('hidden');
+      }
+
+      document.getElementById('sidebar-toggle').addEventListener('click', () => {
+        document.getElementById('sidebar').classList.toggle('-translate-x-full');
+      });
+      document.getElementById('logout-btn').addEventListener('click', () => {
+        sessionStorage.clear();
+        window.location.href = 'index.html';
+      });
+
+      // 状态筛选
+      document.querySelectorAll('#status-tabs .tab-btn').forEach(btn => {
+        btn.addEventListener('click', () => {
+          document.querySelectorAll('#status-tabs .tab-btn').forEach(b => b.classList.remove('active'));
+          btn.classList.add('active');
+          currentStatusFilter = btn.dataset.status;
+          loadPrescriptions();
+        });
+      });
+
+      document.getElementById('btn-search').addEventListener('click', loadPrescriptions);
+      document.getElementById('search-input').addEventListener('keypress', e => { if (e.key === 'Enter') loadPrescriptions(); });
+
+      // 新建处方
+      document.getElementById('btn-new-rx').addEventListener('click', openNewRxModal);
+      document.getElementById('rx-modal-close').addEventListener('click', closeRxModal);
+      document.getElementById('rx-modal-cancel').addEventListener('click', closeRxModal);
+      document.getElementById('btn-add-herb-item').addEventListener('click', addHerbItemRow);
+      document.getElementById('rx-modal-save').addEventListener('click', savePrescription);
+
+      // 详情弹窗
+      document.getElementById('detail-modal-close').addEventListener('click', () => {
+        document.getElementById('detail-modal').classList.add('hidden');
+      });
+
+      // 审核弹窗
+      document.getElementById('audit-approve').addEventListener('click', () => doAudit('approve'));
+      document.getElementById('audit-reject').addEventListener('click', () => doAudit('reject'));
+
+      // 加载药材列表（用于下拉选择）
+      try { allHerbs = await api('GET', '/api/herbs'); } catch(e) {}
+
+      await loadPrescriptions();
+    });
+
+    async function loadPrescriptions() {
+      const keyword = document.getElementById('search-input').value.trim();
+      let url = '/api/prescriptions?';
+      if (currentStatusFilter) url += `status=${currentStatusFilter}&`;
+      if (keyword) url += `keyword=${encodeURIComponent(keyword)}&`;
+      try {
+        const list = await api('GET', url);
+        renderRxTable(list);
+        updateStats(list);
+      } catch(e) {}
+    }
+
+    function updateStats(list) {
+      document.getElementById('stat-total').textContent = list.length;
+      document.getElementById('stat-pending').textContent = list.filter(r => r.status === 'pending').length;
+      document.getElementById('stat-approved').textContent = list.filter(r => r.status === 'approved').length;
+      document.getElementById('stat-dispensed').textContent = list.filter(r => r.status === 'dispensed').length;
+      document.getElementById('stat-rejected').textContent = list.filter(r => r.status === 'rejected').length;
+    }
+
+    function renderRxTable(list) {
+      const tbody = document.getElementById('rx-table-body');
+      const empty = document.getElementById('empty-state');
+      if (list.length === 0) {
+        tbody.innerHTML = '';
+        empty.classList.remove('hidden');
+        return;
+      }
+      empty.classList.add('hidden');
+      tbody.innerHTML = list.map(rx => {
+        const canAudit = currentRole === 'admin' && rx.status === 'pending';
+        const canDispense = currentRole !== 'patient' && rx.status === 'approved';
+        const canDelete = currentRole === 'admin' && rx.status !== 'dispensed';
+        return `
+          <tr class="herb-row">
+            <td class="px-4 py-3 text-sm font-mono text-gray-700">${rx.prescriptionNo}</td>
+            <td class="px-4 py-3 text-sm">
+              <div class="font-medium text-gray-800">${rx.patientName}</div>
+              <div class="text-xs text-gray-400">${rx.patientGender || ''} ${rx.patientAge || ''}岁</div>
+            </td>
+            <td class="px-4 py-3 text-sm text-gray-700">${rx.doctorName || '-'}</td>
+            <td class="px-4 py-3 text-sm text-gray-600 max-w-[150px] truncate" title="${rx.diagnosis || ''}">${rx.diagnosis || '-'}</td>
+            <td class="px-4 py-3 text-sm text-gray-700 text-center">${rx.items.length}</td>
+            <td class="px-4 py-3 text-sm font-medium text-gray-800">¥${rx.totalAmount.toFixed(2)}</td>
+            <td class="px-4 py-3"><span class="status-badge ${STATUS_CLASS[rx.status]}">${STATUS_TEXT[rx.status]}</span></td>
+            <td class="px-4 py-3 text-xs text-gray-500">${rx.createdAt ? rx.createdAt.replace('T', ' ').slice(0,16) : '-'}</td>
+            <td class="px-4 py-3 text-sm">
+              <div class="flex gap-2">
+                <button onclick="viewDetail(${rx.id})" class="text-blue-600 hover:text-blue-800" title="查看详情"><i class="fa fa-eye"></i></button>
+                ${canAudit ? `<button onclick="openAudit(${rx.id})" class="text-green-600 hover:text-green-800" title="审核"><i class="fa fa-check-square-o"></i></button>` : ''}
+                ${canDispense ? `<button onclick="dispenseRx(${rx.id})" class="text-indigo-600 hover:text-indigo-800" title="发药"><i class="fa fa-medkit"></i></button>` : ''}
+                ${canDelete ? `<button onclick="deleteRx(${rx.id})" class="text-red-600 hover:text-red-800" title="删除"><i class="fa fa-trash"></i></button>` : ''}
+              </div>
+            </td>
+          </tr>`;
+      }).join('');
+    }
+
+    // ===== 新建处方 =====
+    function openNewRxModal() {
+      document.getElementById('rx-modal-title').textContent = '新建处方';
+      document.getElementById('rx-patient-name').value = '';
+      document.getElementById('rx-patient-phone').value = '';
+      document.getElementById('rx-patient-gender').value = '';
+      document.getElementById('rx-patient-age').value = '';
+      document.getElementById('rx-department').value = '';
+      document.getElementById('rx-diagnosis').value = '';
+      document.getElementById('rx-advice').value = '';
+      document.getElementById('herb-items-body').innerHTML = '';
+      addHerbItemRow();
+      addHerbItemRow();
+      addHerbItemRow();
+      updateTotalAmount();
+      document.getElementById('rx-modal').classList.remove('hidden');
+    }
+
+    function closeRxModal() {
+      document.getElementById('rx-modal').classList.add('hidden');
+    }
+
+    function addHerbItemRow() {
+      const tbody = document.getElementById('herb-items-body');
+      const herbOptions = allHerbs.map(h => `<option value="${h.code}" data-price="${h.price}" data-name="${h.name}">${h.name} (¥${h.price}/g)</option>`).join('');
+      const tr = document.createElement('tr');
+      tr.className = 'border-t';
+      tr.innerHTML = `
+        <td class="px-3 py-2">
+          <select class="herb-select w-full px-2 py-1 border border-gray-300 rounded text-sm focus:outline-none focus:border-primary">
+            <option value="">请选择药材</option>
+            ${herbOptions}
+          </select>
+        </td>
+        <td class="px-3 py-2"><input type="text" class="herb-dosage w-full px-2 py-1 border border-gray-300 rounded text-sm focus:outline-none focus:border-primary" value="10g"></td>
+        <td class="px-3 py-2"><input type="number" class="herb-quantity w-full px-2 py-1 border border-gray-300 rounded text-sm focus:outline-none focus:border-primary" value="7" min="1"></td>
+        <td class="px-3 py-2"><input type="text" class="herb-usage w-full px-2 py-1 border border-gray-300 rounded text-sm focus:outline-none focus:border-primary" value="水煎"></td>
+        <td class="px-3 py-2"><input type="number" class="herb-price w-full px-2 py-1 border border-gray-300 rounded text-sm focus:outline-none focus:border-primary" value="0" step="0.01" min="0"></td>
+        <td class="px-3 py-2 text-sm font-medium text-gray-700 herb-subtotal">¥0.00</td>
+        <td class="px-3 py-2 text-center"><button class="text-red-500 hover:text-red-700 btn-remove-row"><i class="fa fa-times"></i></button></td>
+      `;
+      tbody.appendChild(tr);
+
+      tr.querySelector('.herb-select').addEventListener('change', function() {
+        const opt = this.options[this.selectedIndex];
+        if (opt && opt.dataset.price) {
+          tr.querySelector('.herb-price').value = opt.dataset.price;
+        }
+        updateTotalAmount();
+      });
+      tr.querySelector('.herb-dosage').addEventListener('input', updateTotalAmount);
+      tr.querySelector('.herb-quantity').addEventListener('input', updateTotalAmount);
+      tr.querySelector('.herb-price').addEventListener('input', updateTotalAmount);
+      tr.querySelector('.btn-remove-row').addEventListener('click', () => {
+        tr.remove();
+        updateTotalAmount();
+      });
+    }
+
+    function updateTotalAmount() {
+      let total = 0;
+      document.querySelectorAll('#herb-items-body tr').forEach(tr => {
+        const dosage = parseFloat((tr.querySelector('.herb-dosage').value || '0').replace('g', '').replace('G', '')) || 0;
+        const qty = parseInt(tr.querySelector('.herb-quantity').value) || 0;
+        const price = parseFloat(tr.querySelector('.herb-price').value) || 0;
+        const subtotal = dosage * qty * price;
+        tr.querySelector('.herb-subtotal').textContent = `¥${subtotal.toFixed(2)}`;
+        total += subtotal;
+      });
+      document.getElementById('rx-total-amount').textContent = `¥${total.toFixed(2)}`;
+    }
+
+    async function savePrescription() {
+      const patientName = document.getElementById('rx-patient-name').value.trim();
+      const diagnosis = document.getElementById('rx-diagnosis').value.trim();
+      if (!patientName) { alert('请填写患者姓名'); return; }
+      if (!diagnosis) { alert('请填写诊断'); return; }
+
+      const items = [];
+      document.querySelectorAll('#herb-items-body tr').forEach(tr => {
+        const select = tr.querySelector('.herb-select');
+        const opt = select.options[select.selectedIndex];
+        if (opt && opt.value) {
+          items.push({
+            herbCode: opt.value,
+            herbName: opt.dataset.name || opt.text,
+            dosage: tr.querySelector('.herb-dosage').value,
+            quantity: parseInt(tr.querySelector('.herb-quantity').value) || 1,
+            usage: tr.querySelector('.herb-usage').value,
+            price: parseFloat(tr.querySelector('.herb-price').value) || 0,
+          });
+        }
+      });
+      if (items.length === 0) { alert('请至少添加一味药材'); return; }
+
+      try {
+        await api('POST', '/api/prescriptions', {
+          patientName,
+          patientPhone: document.getElementById('rx-patient-phone').value.trim(),
+          patientGender: document.getElementById('rx-patient-gender').value,
+          patientAge: document.getElementById('rx-patient-age').value,
+          department: document.getElementById('rx-department').value.trim(),
+          diagnosis,
+          advice: document.getElementById('rx-advice').value.trim(),
+          items,
+        });
+        alert('处方创建成功，等待审核');
+        closeRxModal();
+        loadPrescriptions();
+      } catch(e) {}
+    }
+
+    // ===== 详情 =====
+    async function viewDetail(id) {
+      try {
+        const rx = await api('GET', `/api/prescriptions/${id}`);
+        const itemsHtml = rx.items.map((item, i) => `
+          <tr class="border-t">
+            <td class="px-3 py-2 text-sm">${i + 1}</td>
+            <td class="px-3 py-2 text-sm font-medium">${item.herbName}</td>
+            <td class="px-3 py-2 text-sm">${item.dosage}</td>
+            <td class="px-3 py-2 text-sm">${item.quantity}剂</td>
+            <td class="px-3 py-2 text-sm">${item.usage || '-'}</td>
+            <td class="px-3 py-2 text-sm">¥${item.price.toFixed(2)}/g</td>
+            <td class="px-3 py-2 text-sm font-medium">¥${item.subtotal.toFixed(2)}</td>
+          </tr>`).join('');
+
+        document.getElementById('detail-content').innerHTML = `
+          <div class="grid grid-cols-2 gap-4 mb-4 text-sm">
+            <div><span class="text-gray-500">处方编号：</span><span class="font-mono">${rx.prescriptionNo}</span></div>
+            <div><span class="text-gray-500">状态：</span><span class="status-badge ${STATUS_CLASS[rx.status]}">${STATUS_TEXT[rx.status]}</span></div>
+            <div><span class="text-gray-500">患者：</span>${rx.patientName}（${rx.patientGender || '-'}，${rx.patientAge || '-'}岁）</div>
+            <div><span class="text-gray-500">电话：</span>${rx.patientPhone || '-'}</div>
+            <div><span class="text-gray-500">开方医生：</span>${rx.doctorName || '-'}（${rx.department || '-'}）</div>
+            <div><span class="text-gray-500">创建时间：</span>${rx.createdAt ? rx.createdAt.replace('T',' ').slice(0,16) : '-'}</div>
+            <div class="col-span-2"><span class="text-gray-500">诊断：</span>${rx.diagnosis || '-'}</div>
+            <div class="col-span-2"><span class="text-gray-500">医嘱：</span>${rx.advice || '-'}</div>
+          </div>
+          <div class="border border-gray-200 rounded-lg overflow-hidden mb-4">
+            <table class="w-full">
+              <thead class="bg-gray-50">
+                <tr>
+                  <th class="px-3 py-2 text-left text-xs font-medium text-gray-500">#</th>
+                  <th class="px-3 py-2 text-left text-xs font-medium text-gray-500">药材</th>
+                  <th class="px-3 py-2 text-left text-xs font-medium text-gray-500">剂量</th>
+                  <th class="px-3 py-2 text-left text-xs font-medium text-gray-500">剂数</th>
+                  <th class="px-3 py-2 text-left text-xs font-medium text-gray-500">用法</th>
+                  <th class="px-3 py-2 text-left text-xs font-medium text-gray-500">单价</th>
+                  <th class="px-3 py-2 text-left text-xs font-medium text-gray-500">小计</th>
+                </tr>
+              </thead>
+              <tbody>${itemsHtml}</tbody>
+            </table>
+          </div>
+          <div class="flex justify-between items-center text-sm">
+            <div class="text-gray-500">
+              ${rx.auditTime ? `审核：${rx.auditorName || ''} ${rx.auditTime} ${rx.auditRemark ? '('+rx.auditRemark+')' : ''}` : ''}
+              ${rx.dispenseTime ? ` | 发药：${rx.dispenserName || ''} ${rx.dispenseTime}` : ''}
+            </div>
+            <div class="text-lg font-bold text-primary">合计：¥${rx.totalAmount.toFixed(2)}</div>
+          </div>`;
+        document.getElementById('detail-modal').classList.remove('hidden');
+      } catch(e) {}
+    }
+
+    // ===== 审核 =====
+    function openAudit(id) {
+      currentAuditRxId = id;
+      document.getElementById('audit-rx-info').textContent = `正在审核处方 #${id}，请选择审核结果：`;
+      document.getElementById('audit-remark').value = '';
+      document.getElementById('audit-modal').classList.remove('hidden');
+    }
+
+    async function doAudit(action) {
+      if (!currentAuditRxId) return;
+      try {
+        await api('PUT', `/api/prescriptions/${currentAuditRxId}/audit`, {
+          action,
+          remark: document.getElementById('audit-remark').value.trim(),
+        });
+        alert(action === 'approve' ? '处方审核通过' : '处方已拒绝');
+        document.getElementById('audit-modal').classList.add('hidden');
+        loadPrescriptions();
+      } catch(e) {}
+    }
+
+    // ===== 发药 =====
+    async function dispenseRx(id) {
+      if (!confirm('确认发药？发药后将自动扣减药材库存。')) return;
+      try {
+        await api('PUT', `/api/prescriptions/${id}/dispense`);
+        alert('发药成功，库存已扣减');
+        loadPrescriptions();
+      } catch(e) {}
+    }
+
+    // ===== 删除 =====
+    async function deleteRx(id) {
+      if (!confirm('确认删除该处方？')) return;
+      try {
+        await api('DELETE', `/api/prescriptions/${id}`);
+        alert('删除成功');
+        loadPrescriptions();
+      } catch(e) {}
+    }
+
+// ===== 初始化统一布局 =====
+initUnifiedLayout("处方管理");
+    </script>
+
+    <!-- PWA Service Worker 注册 -->
+    <script>
+    if ('serviceWorker' in navigator) {
+        window.addEventListener('load', function() {
+            navigator.serviceWorker.register('/sw.js')
+                .then(function(registration) {
+                    console.log('PWA: Service Worker 注册成功，范围:', registration.scope);
+                    
+                    // 监听更新
+                    registration.addEventListener('updatefound', function() {
+                        const newWorker = registration.installing;
+                        newWorker.addEventListener('statechange', function() {
+                            if (newWorker.state === 'installed' && navigator.serviceWorker.controller) {
+                                // 显示更新提示
+                                if (confirm('发现新版本，是否立即更新？')) {
+                                    newWorker.postMessage('SKIP_WAITING');
+                                    location.reload();
+                                }
+                            }
+                        });
+                    });
+                })
+                .catch(function(error) {
+                    console.log('PWA: Service Worker 注册失败:', error);
+                });
+        });
+    }
+    
+    // PWA 安装提示
+    let deferredPrompt;
+    window.addEventListener('beforeinstallprompt', function(e) {
+        e.preventDefault();
+        deferredPrompt = e;
+        console.log('PWA: 可以安装应用');
+        
+        // 显示安装按钮（如果有安装按钮元素）
+        const installBtn = document.getElementById('pwa-install-btn');
+        if (installBtn) {
+            installBtn.style.display = 'flex';
+            installBtn.addEventListener('click', function() {
+                if (deferredPrompt) {
+                    deferredPrompt.prompt();
+                    deferredPrompt.userChoice.then(function(choiceResult) {
+                        if (choiceResult.outcome === 'accepted') {
+                            console.log('PWA: 用户接受安装');
+                        }
+                        deferredPrompt = null;
+                        installBtn.style.display = 'none';
+                    });
+                }
+            });
+        }
+    });
+    
+    window.addEventListener('appinstalled', function() {
+        console.log('PWA: 应用已安装');
+        const installBtn = document.getElementById('pwa-install-btn');
+        if (installBtn) {
+            installBtn.style.display = 'none';
+        }
+    });
+    </script>
+
+</body>
+</html>

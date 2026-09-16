@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>操作日志 - 本草智管平台</title>
+    <title>库存预警与智能补货 - 本草智管平台</title>
     <script src="https://cdn.tailwindcss.com"></script>
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
 
@@ -86,7 +86,7 @@
         <div class="topbar">
             <div style="display:flex;align-items:center;gap:8px;">
                 <button class="menu-btn" onclick="toggleSidebar()"><i class="fas fa-bars"></i></button>
-                <h2><i class="fas fa-history" style="color:#68d391;"></i> 操作日志</h2>
+                <h2><i class="fas fa-bell" style="color:#68d391;"></i> 库存预警/补货</h2>
             </div>
             <div class="user-info">
                 <span id="topbar-role-badge" class="role-badge"></span>
@@ -107,58 +107,86 @@
 
         <div class="content">
 <div class="space-y-6">
-        <div class="flex justify-between items-center">
+        <div class="flex items-center justify-between">
           <div>
-            <h2 class="text-2xl font-bold text-gray-800">操作日志</h2>
-            <p class="text-sm text-gray-500 mt-1">记录所有药材的新增、编辑、删除操作，日志最长保留1年</p>
+            <h2 class="text-2xl font-bold text-gray-800">库存预警与智能补货</h2>
+            <p class="text-gray-500 mt-1">基于历史消耗数据智能分析，自动生成补货建议</p>
           </div>
-          <div class="flex items-center gap-2 text-sm text-gray-500">
-            <i class="fa fa-database"></i>
-            <span>共 <span id="log-total-count" class="font-bold text-primary">0</span> 条记录</span>
-          </div>
-        </div>
-
-        <!-- 筛选栏 -->
-        <div class="bg-white rounded-xl p-4 shadow-md">
-          <div class="flex flex-wrap items-center gap-3">
-            <div class="flex items-center gap-2">
-              <i class="fa fa-filter text-gray-400"></i>
-              <span class="text-sm text-gray-600">筛选：</span>
-            </div>
-            <select id="filter-herb" class="filter-select min-w-[160px]">
-              <option value="">全部药材</option>
+          <div class="flex items-center gap-2">
+            <select id="days-select" class="border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary/50">
+              <option value="7">近7天</option>
+              <option value="14">近14天</option>
+              <option value="30" selected>近30天</option>
+              <option value="60">近60天</option>
+              <option value="90">近90天</option>
             </select>
-            <select id="filter-action" class="filter-select">
-              <option value="">全部操作</option>
-              <option value="add">新增</option>
-              <option value="edit">编辑</option>
-              <option value="delete">删除</option>
-            </select>
-            <select id="filter-time" class="filter-select">
-              <option value="">全部时间</option>
-              <option value="today">今天</option>
-              <option value="week">近7天</option>
-              <option value="month">近30天</option>
-              <option value="quarter">近90天</option>
-            </select>
-            <div class="flex-1"></div>
-            <input type="text" id="search-input" class="filter-select flex-1 min-w-[200px]" placeholder="搜索操作人或变更内容...">
-            <button id="reset-filter" class="px-4 py-2 border border-gray-300 rounded-lg text-sm text-gray-600 hover:bg-gray-50 transition-colors">
-              <i class="fa fa-refresh mr-1"></i> 重置
+            <button id="btn-refresh" class="px-4 py-2 bg-primary text-white rounded-lg font-medium hover:bg-green-700 transition-colors">
+              <i class="fa fa-refresh mr-1"></i> 刷新分析
             </button>
           </div>
         </div>
 
-        <!-- 日志列表 -->
-        <div class="bg-white rounded-xl p-6 shadow-md">
-          <div id="log-empty-state" class="flex flex-col items-center justify-center py-16 hidden">
-            <div class="w-20 h-20 bg-gray-100 rounded-full flex items-center justify-center text-gray-400 mb-4">
-              <i class="fa fa-history text-4xl"></i>
-            </div>
-            <h3 class="text-lg font-medium text-gray-700 mb-2">暂无日志记录</h3>
-            <p class="text-gray-400 text-sm">没有符合筛选条件的操作记录</p>
+        <!-- 统计卡片 -->
+        <div class="grid grid-cols-1 md:grid-cols-4 gap-4">
+          <div class="bg-white rounded-xl p-4 shadow-md border-l-4 border-red-500">
+            <p class="text-sm text-gray-500">紧急缺货</p>
+            <p class="text-2xl font-bold text-red-600 mt-1" id="stat-critical">0</p>
+            <p class="text-xs text-gray-400 mt-1">库存为0，需立即补货</p>
           </div>
-          <div id="log-timeline" class="log-timeline"></div>
+          <div class="bg-white rounded-xl p-4 shadow-md border-l-4 border-yellow-500">
+            <p class="text-sm text-gray-500">库存不足</p>
+            <p class="text-2xl font-bold text-yellow-600 mt-1" id="stat-warning">0</p>
+            <p class="text-xs text-gray-400 mt-1">低于预警阈值</p>
+          </div>
+          <div class="bg-white rounded-xl p-4 shadow-md border-l-4 border-blue-500">
+            <p class="text-sm text-gray-500">补货建议数</p>
+            <p class="text-2xl font-bold text-blue-600 mt-1" id="stat-suggestions">0</p>
+            <p class="text-xs text-gray-400 mt-1">基于消耗趋势分析</p>
+          </div>
+          <div class="bg-white rounded-xl p-4 shadow-md border-l-4 border-green-500">
+            <p class="text-sm text-gray-500">预计采购金额</p>
+            <p class="text-2xl font-bold text-green-600 mt-1">¥<span id="stat-cost">0</span></p>
+            <p class="text-xs text-gray-400 mt-1">按建议补货量估算</p>
+          </div>
+        </div>
+
+        <!-- 库存预警列表 -->
+        <div class="bg-white rounded-xl shadow-md overflow-hidden">
+          <div class="px-6 py-4 border-b bg-gray-50">
+            <h3 class="text-lg font-bold text-gray-800"><i class="fa fa-exclamation-triangle text-yellow-500 mr-2"></i>库存预警列表</h3>
+          </div>
+          <div id="warning-list" class="divide-y divide-gray-100">
+            <div class="p-8 text-center text-gray-400">加载中...</div>
+          </div>
+        </div>
+
+        <!-- 智能补货建议 -->
+        <div class="bg-white rounded-xl shadow-md overflow-hidden">
+          <div class="px-6 py-4 border-b bg-gray-50 flex justify-between items-center">
+            <h3 class="text-lg font-bold text-gray-800"><i class="fa fa-lightbulb-o text-primary mr-2"></i>智能补货建议</h3>
+            <button id="btn-create-po" class="px-3 py-1.5 bg-primary text-white rounded-lg text-sm font-medium hover:bg-green-700 transition-colors">
+              <i class="fa fa-shopping-cart mr-1"></i> 生成采购单
+            </button>
+          </div>
+          <div class="overflow-x-auto">
+            <table class="w-full">
+              <thead class="bg-gray-50 border-b">
+                <tr>
+                  <th class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">优先级</th>
+                  <th class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">药材</th>
+                  <th class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">当前库存</th>
+                  <th class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">日均消耗</th>
+                  <th class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">可维持天数</th>
+                  <th class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">建议补货量</th>
+                  <th class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">预计金额</th>
+                  <th class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">库存状态</th>
+                </tr>
+              </thead>
+              <tbody id="suggestion-table-body" class="divide-y divide-gray-200">
+                <tr><td colspan="8" class="px-4 py-8 text-center text-gray-400">加载中...</td></tr>
+              </tbody>
+            </table>
+          </div>
         </div>
       </div>
         </div>
@@ -222,52 +250,23 @@ tailwind.config = {
       }
     }
 
-// ===== 后端 API 辅助层 =====
-    const API_BASE = '';
+const API_BASE = '';
     async function api(method, url, body) {
       const opts = { method: method, headers: { 'Content-Type': 'application/json', 'X-User': sessionStorage.getItem('current_user') || '' } };
       if (body !== undefined) opts.body = JSON.stringify(body);
       const resp = await fetch(API_BASE + url, opts);
       const result = await resp.json().catch(() => ({ code: -1, message: '服务器连接失败' }));
-      if (result.code !== 0) {
-        alert(result.message);
-        throw new Error(result.message);
-      }
+      if (result.code !== 0) { alert(result.message); throw new Error(result.message); }
       return result.data;
     }
 
-    const LOGS_KEY = 'herb_operation_logs';
-    const LOG_RETENTION_DAYS = 365;
-    const ACTION_TEXT = { add: '新增药材', edit: '编辑药材', delete: '删除药材' };
-    const ACTION_BADGE = { add: 'badge-add', edit: 'badge-edit', delete: 'badge-delete' };
-    const FIELD_LABELS = {
-      name: '药材名称', category: '类别', origin: '产地', storage: '储存条件',
-      unit: '单位', price: '单价', quantity: '库存数量', description: '描述',
-      warningThreshold: '预警阈值'
-    };
+    const PRIORITY_TEXT = { critical: '紧急', high: '高', medium: '中', low: '低' };
 
-    // 日志统一从后端 MySQL 获取，前端不再使用 localStorage
-    function getLogs() { return []; }
-    function cleanupOldLogs() { return []; }
-
-    document.addEventListener('DOMContentLoaded', () => {
-      cleanupOldLogs();
-
-      document.getElementById('sidebar-toggle').addEventListener('click', () => {
-        document.getElementById('sidebar').classList.toggle('-translate-x-full');
-      });
-
+    document.addEventListener('DOMContentLoaded', async () => {
       const currentUser = sessionStorage.getItem('current_user');
       const currentRole = sessionStorage.getItem('current_role');
       const currentName = sessionStorage.getItem('current_name') || currentUser;
       if (!currentUser) window.location.href = 'index.html';
-
-      // 非管理员无权限查看日志
-      if (currentRole !== 'admin') {
-        alert('您没有权限查看操作日志');
-        window.location.href = 'dashboard.html';
-        return;
-      }
 
       const roleText = { admin: '管理员', doctor: '医生', patient: '病人' };
       document.getElementById('welcome-message').textContent = `欢迎，${currentName}`;
@@ -279,121 +278,123 @@ tailwind.config = {
         if (!allowedRoles.includes(currentRole)) item.classList.add('hidden');
       });
 
-      // 初始化药材筛选下拉
-      initHerbFilter();
-
-      // 绑定筛选事件
-      document.getElementById('filter-herb').addEventListener('change', renderLogs);
-      document.getElementById('filter-action').addEventListener('change', renderLogs);
-      document.getElementById('filter-time').addEventListener('change', renderLogs);
-      document.getElementById('search-input').addEventListener('input', renderLogs);
-      document.getElementById('reset-filter').addEventListener('click', () => {
-        document.getElementById('filter-herb').value = '';
-        document.getElementById('filter-action').value = '';
-        document.getElementById('filter-time').value = '';
-        document.getElementById('search-input').value = '';
-        renderLogs();
+      document.getElementById('sidebar-toggle').addEventListener('click', () => {
+        document.getElementById('sidebar').classList.toggle('-translate-x-full');
       });
-
-      // 退出登录
       document.getElementById('logout-btn').addEventListener('click', () => {
-        sessionStorage.removeItem('current_user');
-        sessionStorage.removeItem('current_role');
-        sessionStorage.removeItem('current_name');
-        sessionStorage.removeItem('stock_warning_shown');
+        sessionStorage.clear();
         window.location.href = 'index.html';
       });
 
-      renderLogs();
+      document.getElementById('btn-refresh').addEventListener('click', loadData);
+      document.getElementById('days-select').addEventListener('change', loadData);
+      document.getElementById('btn-create-po').addEventListener('click', () => {
+        window.location.href = 'purchase.html';
+      });
+
+      loadData();
     });
 
-    async function initHerbFilter() {
-      const herbNames = new Set();
+    async function loadData() {
+      const days = document.getElementById('days-select').value;
       try {
-        const herbs = await api('GET', '/api/herbs');
-        herbs.forEach(h => herbNames.add(h.name));
-      } catch (e) {}
-      try {
-        const logs = await api('GET', '/api/logs');
-        logs.forEach(l => herbNames.add(l.herbName));
-      } catch (e) {}
-      const select = document.getElementById('filter-herb');
-      Array.from(herbNames).sort().forEach(name => {
-        const opt = document.createElement('option');
-        opt.value = name;
-        opt.textContent = name;
-        select.appendChild(opt);
-      });
+        const [warnings, suggestions] = await Promise.all([
+          api('GET', '/api/stock/warnings'),
+          api('GET', `/api/stock/replenish-suggestions?days=${days}`)
+        ]);
+        renderWarnings(warnings);
+        renderSuggestions(suggestions);
+        updateStats(warnings, suggestions);
+      } catch (e) {
+        console.error(e);
+      }
     }
 
-    async function renderLogs() {
-      const filterHerb = document.getElementById('filter-herb').value;
-      const filterAction = document.getElementById('filter-action').value;
-      const filterTime = document.getElementById('filter-time').value;
-      const searchKw = document.getElementById('search-input').value.trim().toLowerCase();
+    function updateStats(warnings, suggestions) {
+      const critical = warnings.filter(w => w.status === 'critical').length;
+      const warning = warnings.filter(w => w.status === 'warning').length;
+      document.getElementById('stat-critical').textContent = critical;
+      document.getElementById('stat-warning').textContent = warning;
+      document.getElementById('stat-suggestions').textContent = suggestions.totalSuggestions;
+      document.getElementById('stat-cost').textContent = (suggestions.totalEstimatedCost || 0).toFixed(2);
+    }
 
-      // 后端按筛选条件查询日志
-      const params = new URLSearchParams();
-      if (filterHerb) params.set('herb', filterHerb);
-      if (filterAction) params.set('action', filterAction);
-      if (filterTime) params.set('time', filterTime);
-      if (searchKw) params.set('keyword', searchKw);
-      let logs = await api('GET', '/api/logs?' + params.toString());
-
-      // 按时间倒序
-      logs.sort((a, b) => b.timestamp - a.timestamp);
-
-      document.getElementById('log-total-count').textContent = logs.length;
-
-      const timeline = document.getElementById('log-timeline');
-      const emptyState = document.getElementById('log-empty-state');
-
-      if (logs.length === 0) {
-        timeline.innerHTML = '';
-        emptyState.classList.remove('hidden');
+    function renderWarnings(list) {
+      const container = document.getElementById('warning-list');
+      if (list.length === 0) {
+        container.innerHTML = '<div class="p-8 text-center text-gray-400"><i class="fa fa-check-circle text-4xl text-green-400 mb-2"></i><p>所有药材库存充足，暂无预警</p></div>';
         return;
       }
-
-      emptyState.classList.add('hidden');
-      timeline.innerHTML = logs.map(log => {
-        const changesHtml = (log.changes || [])
-          .filter(c => c.field !== 'description' || log.action !== 'add')
-          .map(c => {
-            const isQty = c.field === 'quantity';
-            return `<div class="log-change ${isQty ? 'quantity-change' : ''}">
-              <i class="fa ${isQty ? 'fa-cubes' : 'fa-pencil'} text-xs mr-1"></i>
-              <span class="font-medium">${c.label || c.field}：</span>
-              ${c.oldValue !== null && c.oldValue !== undefined ? `<span class="old">${c.oldValue}</span> → ` : ''}
-              <span class="new">${c.newValue !== null && c.newValue !== undefined ? c.newValue : '已删除'}</span>
-            </div>`;
-          }).join('');
-
+      container.innerHTML = list.map(h => {
+        const percent = h.warningThreshold > 0 ? Math.min(100, (h.quantity / h.warningThreshold) * 100) : 0;
+        const barColor = h.quantity === 0 ? '#dc3545' : percent < 50 ? '#ffc107' : '#17a2b8';
         return `
-          <div class="log-item action-${log.action}">
-            <div class="log-card">
-              <div class="flex items-center justify-between mb-2">
-                <div class="flex items-center gap-2">
-                  <span class="px-2 py-1 rounded-full text-xs font-medium ${ACTION_BADGE[log.action] || ''}">
-                    <i class="fa ${log.action === 'add' ? 'fa-plus' : log.action === 'edit' ? 'fa-edit' : 'fa-trash'} mr-1"></i>
-                    ${ACTION_TEXT[log.action] || log.action}
-                  </span>
-                  <span class="font-medium text-gray-800">${log.herbName}</span>
-                  <span class="text-xs text-gray-400">(${log.herbCode})</span>
+          <div class="px-6 py-4 hover:bg-gray-50">
+            <div class="flex items-center justify-between">
+              <div class="flex items-center flex-1">
+                <div class="w-10 h-10 rounded-full ${h.quantity === 0 ? 'bg-red-100 text-red-500' : 'bg-yellow-100 text-yellow-500'} flex items-center justify-center mr-4">
+                  <i class="fa ${h.quantity === 0 ? 'fa-times-circle' : 'fa-exclamation-triangle'}"></i>
                 </div>
-                <span class="text-xs text-gray-400"><i class="fa fa-clock-o mr-1"></i>${log.timeStr}</span>
+                <div class="flex-1">
+                  <div class="flex items-center gap-3">
+                    <span class="font-medium text-gray-800">${h.name}</span>
+                    <span class="text-xs text-gray-400">${h.code}</span>
+                    <span class="text-xs px-2 py-0.5 bg-gray-100 rounded text-gray-500">${h.category || '未分类'}</span>
+                  </div>
+                  <div class="mt-2 flex items-center gap-4">
+                    <div class="flex-1 max-w-xs">
+                      <div class="progress-bar">
+                        <div class="progress-fill" style="width: ${percent}%; background: ${barColor};"></div>
+                      </div>
+                    </div>
+                    <span class="text-sm ${h.quantity === 0 ? 'text-red-600 font-bold' : 'text-yellow-600'}">${h.quantity} ${h.unit}</span>
+                    <span class="text-xs text-gray-400">/ 阈值 ${h.warningThreshold}${h.unit}</span>
+                  </div>
+                </div>
               </div>
-              <div class="text-xs text-gray-500 mb-1">
-                <i class="fa fa-user mr-1"></i>操作人：${log.operatorName || log.operator}（${log.operator}）
+              <div class="text-right ml-4">
+                <p class="text-sm text-gray-500">缺口</p>
+                <p class="text-lg font-bold text-red-500">${h.shortage} ${h.unit}</p>
               </div>
-              ${changesHtml}
             </div>
           </div>
         `;
       }).join('');
     }
 
+    function renderSuggestions(data) {
+      const tbody = document.getElementById('suggestion-table-body');
+      const items = data.items || [];
+      if (items.length === 0) {
+        tbody.innerHTML = '<tr><td colspan="8" class="px-4 py-8 text-center text-gray-400"><i class="fa fa-check-circle text-3xl text-green-400 mb-2"></i><p>库存充足，暂无补货建议</p></td></tr>';
+        return;
+      }
+      tbody.innerHTML = items.map(s => {
+        const daysColor = s.daysRemaining <= 7 ? 'text-red-600 font-bold' : s.daysRemaining <= 15 ? 'text-yellow-600' : 'text-gray-600';
+        return `
+          <tr class="hover:bg-gray-50">
+            <td class="px-4 py-3"><span class="priority-badge priority-${s.priority}" style="display:inline-block;padding:2px 10px;border-radius:12px;font-size:12px;font-weight:500;">${PRIORITY_TEXT[s.priority] || s.priority}</span></td>
+            <td class="px-4 py-3">
+              <p class="font-medium text-gray-800">${s.name}</p>
+              <p class="text-xs text-gray-400">${s.code} · ${s.category || ''}</p>
+            </td>
+            <td class="px-4 py-3 text-sm">${s.currentStock} ${s.unit}</td>
+            <td class="px-4 py-3 text-sm">${s.dailyAvgUsage} ${s.unit}/天</td>
+            <td class="px-4 py-3 text-sm ${daysColor}">${s.daysRemaining >= 999 ? '∞' : s.daysRemaining + ' 天'}</td>
+            <td class="px-4 py-3 text-sm font-medium text-primary">${s.suggestedQuantity} ${s.unit}</td>
+            <td class="px-4 py-3 text-sm font-medium text-gray-800">¥${s.estimatedCost.toFixed(2)}</td>
+            <td class="px-4 py-3">
+              <div class="w-20 progress-bar">
+                <div class="progress-fill" style="width: ${Math.min(100, (s.currentStock / (s.warningThreshold || 1)) * 100)}%; background: ${s.currentStock === 0 ? '#dc3545' : s.currentStock <= s.warningThreshold ? '#ffc107' : '#28a745'};"></div>
+              </div>
+            </td>
+          </tr>
+        `;
+      }).join('');
+    }
+
 // ===== 初始化统一布局 =====
-initUnifiedLayout("操作日志");
+initUnifiedLayout("库存预警/补货");
     </script>
 
     <!-- PWA Service Worker 注册 -->

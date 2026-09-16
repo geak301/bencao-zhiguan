@@ -1,0 +1,598 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>数据看板 - 本草智管平台</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <script src="https://cdn.jsdelivr.net/npm/echarts@5.4.3/dist/echarts.min.js"></script>
+
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
+        body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", "PingFang SC", "Microsoft YaHei", sans-serif; background: #f5f7fa; }
+        .sidebar { width: 240px; background: linear-gradient(180deg, #1a365d 0%, #2c5282 100%); min-height: 100vh; position: fixed; left: 0; top: 0; color: white; overflow-y: auto; z-index: 40; transform: translateX(-100%); transition: transform 0.3s ease; }
+        .sidebar.open { transform: translateX(0); }
+        @media (min-width: 768px) { .sidebar { transform: translateX(0); position: fixed; } }
+        .sidebar-overlay { display: none; position: fixed; inset: 0; background: rgba(0,0,0,0.5); z-index: 35; }
+        .sidebar-overlay.show { display: block; }
+        .sidebar-brand { padding: 20px; text-align: center; border-bottom: 1px solid rgba(255,255,255,0.1); }
+        .sidebar-brand h1 { font-size: 18px; font-weight: 600; }
+        .sidebar-brand p { font-size: 12px; opacity: 0.7; margin-top: 4px; }
+        .nav-item { display: flex; align-items: center; padding: 12px 20px; color: rgba(255,255,255,0.8); text-decoration: none; transition: all 0.2s; cursor: pointer; }
+        .nav-item:hover { background: rgba(255,255,255,0.1); color: white; }
+        .nav-item.active { background: rgba(255,255,255,0.15); color: white; border-left: 3px solid #68d391; }
+        .nav-item i { width: 20px; margin-right: 12px; }
+        .nav-section { padding: 16px 20px 8px; font-size: 11px; text-transform: uppercase; opacity: 0.5; letter-spacing: 1px; }
+        .main { margin-left: 0; min-height: 100vh; display: flex; flex-direction: column; }
+        @media (min-width: 768px) { .main { margin-left: 240px; } }
+        .topbar { background: white; padding: 12px 16px; display: flex; justify-content: space-between; align-items: center; box-shadow: 0 1px 3px rgba(0,0,0,0.05); position: sticky; top: 0; z-index: 30; }
+        @media (min-width: 768px) { .topbar { padding: 12px 24px; } }
+        .topbar h2 { font-size: 16px; font-weight: 600; color: #2d3748; display: flex; align-items: center; gap: 8px; }
+        @media (min-width: 768px) { .topbar h2 { font-size: 18px; } }
+        .menu-btn { background: none; border: none; font-size: 20px; color: #2d3748; cursor: pointer; padding: 4px 8px; }
+        @media (min-width: 768px) { .menu-btn { display: none; } }
+        .user-info { display: flex; align-items: center; gap: 8px; }
+        @media (min-width: 768px) { .user-info { gap: 12px; } }
+        .user-avatar { width: 32px; height: 32px; border-radius: 50%; background: linear-gradient(135deg, #68d391, #38a169); display: flex; align-items: center; justify-content: center; color: white; font-weight: 600; font-size: 14px; }
+        @media (min-width: 768px) { .user-avatar { width: 36px; height: 36px; } }
+        .role-badge { display: inline-block; padding: 2px 8px; border-radius: 10px; font-size: 10px; font-weight: 500; }
+        @media (min-width: 768px) { .role-badge { font-size: 11px; } }
+        .role-badge.doctor { background: #bee3f8; color: #2c5282; }
+        .role-badge.admin { background: #fefcbf; color: #975a16; }
+        .role-badge.patient { background: #c6f6d5; color: #276749; }
+        .content { flex: 1; padding: 16px; }
+        @media (min-width: 768px) { .content { padding: 24px; } }
+    </style>
+
+
+    <!-- PWA 支持 -->
+    <link rel="manifest" href="/manifest.json">
+    <meta name="theme-color" content="#1a365d">
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+    <meta name="apple-mobile-web-app-title" content="本草智管">
+    <link rel="apple-touch-icon" href="/icon-192x192.png">
+    <link rel="icon" type="image/x-icon" href="/favicon.ico">
+
+</head>
+<body>
+    <div class="sidebar-overlay" id="sidebar-overlay" onclick="toggleSidebar()"></div>
+    <div class="sidebar" id="sidebar">
+
+        <div class="sidebar-brand">
+          <h1><i class="fas fa-leaf"></i> 本草智管</h1>
+          <p>中医门诊药材库存管理系统</p>
+        </div>
+        <div id="nav-menu">
+          <div class="nav-section">核心功能</div>
+          <div class="nav-item" onclick="location.href='dashboard.html'"><i class="fas fa-tachometer-alt"></i>控制面板</div>
+          <div class="nav-item" onclick="location.href='prescriptions.html'"><i class="fas fa-file-prescription"></i>处方管理</div>
+          <div class="nav-item" onclick="location.href='data-board.html'"><i class="fas fa-chart-bar"></i>数据看板</div>
+          <div class="nav-item" onclick="location.href='assistant.html'"><i class="fas fa-robot"></i>智能助手</div>
+          <div class="nav-section">库存管理</div>
+          <div class="nav-item" onclick="location.href='herbs.html'"><i class="fas fa-boxes"></i>药材管理</div>
+          <div class="nav-item" onclick="location.href='purchase.html'"><i class="fas fa-truck-loading"></i>采购管理</div>
+          <div class="nav-item" onclick="location.href='replenish.html'"><i class="fas fa-bell"></i>库存预警/补货</div>
+          <div class="nav-item" onclick="location.href='stock-flow.html'"><i class="fas fa-exchange-alt"></i>库存流水</div>
+          <div class="nav-section">系统管理</div>
+          <div class="nav-item" onclick="location.href='users.html'"><i class="fas fa-users"></i>用户管理</div>
+          <div class="nav-item" onclick="location.href='logs.html'"><i class="fas fa-history"></i>操作日志</div>
+          <div class="nav-item" onclick="logout()"><i class="fas fa-sign-out-alt"></i>退出登录</div>
+        </div>
+
+    </div>
+
+    <div class="main">
+        <div class="topbar">
+            <div style="display:flex;align-items:center;gap:8px;">
+                <button class="menu-btn" onclick="toggleSidebar()"><i class="fas fa-bars"></i></button>
+                <h2><i class="fas fa-chart-bar" style="color:#68d391;"></i> 数据看板</h2>
+            </div>
+            <div class="user-info">
+                <span id="topbar-role-badge" class="role-badge"></span>
+                <span id="topbar-username" style="font-size:13px;color:#4a5568;"></span>
+                <div class="user-avatar" id="topbar-avatar"></div>
+            </div>
+        </div>
+
+        <!-- 兼容层：旧布局元素的隐藏占位，防止原JS报错 -->
+        <div style="display:none;">
+            <button id="sidebar-toggle"></button>
+            <span id="welcome-message"></span>
+            <p id="sidebar-username"></p>
+            <p id="sidebar-role"></p>
+            <button id="logout-btn" onclick="logout()"></button>
+            <nav id="sidebar-nav"></nav>
+        </div>
+
+        <div class="content">
+<div class="space-y-6">
+        <!-- 标题 -->
+        <div class="flex items-center justify-between">
+          <div>
+            <h2 class="text-2xl font-bold text-gray-800">数据看板</h2>
+            <p class="text-gray-500 mt-1">处方与药材运营数据可视化分析</p>
+          </div>
+          <div class="flex items-center gap-2">
+            <span class="text-sm text-gray-500">趋势周期：</span>
+            <button class="range-btn" data-days="7">近7天</button>
+            <button class="range-btn active" data-days="14">近14天</button>
+            <button class="range-btn" data-days="30">近30天</button>
+          </div>
+        </div>
+
+        <!-- 总览统计卡片 -->
+        <div class="grid grid-cols-2 md:grid-cols-4 gap-4">
+          <div class="stat-card bg-white rounded-xl p-5 shadow-md">
+            <div class="flex items-center justify-between">
+              <div>
+                <p class="text-sm text-gray-500">处方总数</p>
+                <p class="text-3xl font-bold text-gray-800 mt-1" id="ov-total-rx">0</p>
+                <p class="text-xs text-gray-400 mt-1">累计开具处方</p>
+              </div>
+              <div class="w-12 h-12 bg-green-100 rounded-full flex items-center justify-center text-green-600">
+                <i class="fa fa-file-text-o text-xl"></i>
+              </div>
+            </div>
+          </div>
+          <div class="stat-card bg-white rounded-xl p-5 shadow-md">
+            <div class="flex items-center justify-between">
+              <div>
+                <p class="text-sm text-gray-500">处方总金额</p>
+                <p class="text-3xl font-bold text-gray-800 mt-1" id="ov-total-amount">¥0</p>
+                <p class="text-xs text-gray-400 mt-1">已审核+已发药</p>
+              </div>
+              <div class="w-12 h-12 bg-yellow-100 rounded-full flex items-center justify-center text-yellow-600">
+                <i class="fa fa-rmb text-xl"></i>
+              </div>
+            </div>
+          </div>
+          <div class="stat-card bg-white rounded-xl p-5 shadow-md">
+            <div class="flex items-center justify-between">
+              <div>
+                <p class="text-sm text-gray-500">药材种类</p>
+                <p class="text-3xl font-bold text-gray-800 mt-1" id="ov-herb-count">0</p>
+                <p class="text-xs text-gray-400 mt-1">库存总量 <span id="ov-herb-stock">0</span></p>
+              </div>
+              <div class="w-12 h-12 bg-blue-100 rounded-full flex items-center justify-center text-blue-600">
+                <i class="fa fa-pagelines text-xl"></i>
+              </div>
+            </div>
+          </div>
+          <div class="stat-card bg-white rounded-xl p-5 shadow-md">
+            <div class="flex items-center justify-between">
+              <div>
+                <p class="text-sm text-gray-500">库存预警</p>
+                <p class="text-3xl font-bold text-red-600 mt-1" id="ov-low-stock">0</p>
+                <p class="text-xs text-gray-400 mt-1">种药材低于阈值</p>
+              </div>
+              <div class="w-12 h-12 bg-red-100 rounded-full flex items-center justify-center text-red-600">
+                <i class="fa fa-exclamation-triangle text-xl"></i>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- 第一行图表：趋势 + 状态分布 -->
+        <div class="grid grid-cols-1 lg:grid-cols-3 gap-6">
+          <div class="chart-box lg:col-span-2">
+            <div class="chart-title"><i class="fa fa-line-chart"></i>处方数量与金额趋势</div>
+            <div id="chart-trend" style="width:100%;height:320px;"></div>
+          </div>
+          <div class="chart-box">
+            <div class="chart-title"><i class="fa fa-pie-chart"></i>处方状态分布</div>
+            <div id="chart-status" style="width:100%;height:320px;"></div>
+          </div>
+        </div>
+
+        <!-- 第二行图表：药材消耗 + 医生工作量 -->
+        <div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
+          <div class="chart-box">
+            <div class="chart-title"><i class="fa fa-bar-chart"></i>药材消耗排行 TOP10（已发药处方）</div>
+            <div id="chart-consumption" style="width:100%;height:320px;"></div>
+          </div>
+          <div class="chart-box">
+            <div class="chart-title"><i class="fa fa-user-md"></i>医生工作量统计</div>
+            <div id="chart-doctor" style="width:100%;height:320px;"></div>
+          </div>
+        </div>
+
+        <!-- 第三行图表：药材类别分布 -->
+        <div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
+          <div class="chart-box">
+            <div class="chart-title"><i class="fa fa-th-large"></i>药材类别分布</div>
+            <div id="chart-category" style="width:100%;height:320px;"></div>
+          </div>
+          <div class="chart-box">
+            <div class="chart-title"><i class="fa fa-tasks"></i>处方处理效率</div>
+            <div id="chart-efficiency" style="width:100%;height:320px;"></div>
+          </div>
+        </div>
+      </div>
+        </div>
+    </div>
+
+    <script>
+
+    // ===== 统一布局工具函数 =====
+    function toggleSidebar() {
+      document.getElementById('sidebar').classList.toggle('open');
+      document.getElementById('sidebar-overlay').classList.toggle('show');
+    }
+    function logout() {
+      sessionStorage.removeItem('current_user');
+      sessionStorage.removeItem('current_role');
+      sessionStorage.removeItem('current_name');
+      window.location.href = 'index.html';
+    }
+    function initUnifiedLayout(pageName) {
+      const currentUser = sessionStorage.getItem('current_user');
+      const currentRole = sessionStorage.getItem('current_role');
+      const currentName = sessionStorage.getItem('current_name') || currentUser;
+      if (!currentUser) { window.location.href = 'index.html'; return; }
+      const roleText = { admin: '管理员', doctor: '医生', patient: '患者' };
+      const userNameEl = document.getElementById('topbar-username');
+      const userAvatarEl = document.getElementById('topbar-avatar');
+      const roleBadgeEl = document.getElementById('topbar-role-badge');
+      if (userNameEl) userNameEl.textContent = currentName;
+      if (userAvatarEl) userAvatarEl.textContent = currentName.charAt(0);
+      if (roleBadgeEl) {
+        roleBadgeEl.className = 'role-badge ' + currentRole;
+        roleBadgeEl.textContent = roleText[currentRole] || currentRole;
+      }
+      document.querySelectorAll('.nav-item').forEach(item => {
+        if (item.textContent.includes(pageName)) item.classList.add('active');
+      });
+      const rolePermissions = {
+        patient: ['控制面板', '处方管理', '数据看板', '智能助手', '退出登录'],
+        doctor: ['控制面板', '处方管理', '数据看板', '药材管理', '智能助手', '采购管理', '库存预警/补货', '库存流水', '退出登录'],
+        admin: ['控制面板', '处方管理', '数据看板', '药材管理', '智能助手', '采购管理', '库存预警/补货', '库存流水', '用户管理', '操作日志', '退出登录'],
+      };
+      const allowed = rolePermissions[currentRole] || [];
+      document.querySelectorAll('.nav-item').forEach(item => {
+        const text = item.textContent.trim();
+        if (!allowed.some(a => text.includes(a))) item.style.display = 'none';
+      });
+    }
+
+
+// ===== 原页面业务逻辑 =====
+tailwind.config = {
+      theme: {
+        extend: {
+          colors: {
+            primary: '#2E7D32',
+            secondary: '#8D6E63',
+            accent: '#D32F2F',
+            neutral: '#F5F5F5',
+          }
+        }
+      }
+    }
+
+const API_BASE = '';
+    let currentUser = null, currentRole = null, currentName = null;
+    let chartTrend, chartStatus, chartConsumption, chartDoctor, chartCategory, chartEfficiency;
+    let currentDays = 14;
+
+    async function api(method, url, body) {
+      const opts = { method, headers: { 'Content-Type': 'application/json', 'X-User': sessionStorage.getItem('current_user') || '' } };
+      if (body !== undefined) opts.body = JSON.stringify(body);
+      const resp = await fetch(API_BASE + url, opts);
+      const result = await resp.json().catch(() => ({ code: -1, message: '服务器连接失败' }));
+      if (result.code !== 0) { alert(result.message); throw new Error(result.message); }
+      return result.data;
+    }
+
+    const GREEN_COLORS = ['#2E7D32', '#388E3C', '#43A047', '#4CAF50', '#66BB6A', '#81C784', '#A5D6A7', '#C8E6C9', '#1B5E20', '#2E7D32'];
+
+    document.addEventListener('DOMContentLoaded', async () => {
+      currentUser = sessionStorage.getItem('current_user');
+      currentRole = sessionStorage.getItem('current_role');
+      currentName = sessionStorage.getItem('current_name') || currentUser;
+      if (!currentUser) window.location.href = 'index.html';
+
+      const roleText = { admin: '管理员', doctor: '医生', patient: '病人' };
+      document.getElementById('welcome-message').textContent = `欢迎，${currentName}`;
+      document.getElementById('sidebar-username').textContent = currentName;
+      document.getElementById('sidebar-role').textContent = roleText[currentRole] || '用户';
+
+      document.querySelectorAll('#sidebar-nav > a[data-role]').forEach(item => {
+        if (!item.dataset.role.split(',').includes(currentRole)) item.classList.add('hidden');
+      });
+
+      document.getElementById('sidebar-toggle').addEventListener('click', () => {
+        document.getElementById('sidebar').classList.toggle('-translate-x-full');
+      });
+      document.getElementById('logout-btn').addEventListener('click', () => {
+        sessionStorage.clear();
+        window.location.href = 'index.html';
+      });
+
+      // 周期切换
+      document.querySelectorAll('.range-btn').forEach(btn => {
+        btn.addEventListener('click', () => {
+          document.querySelectorAll('.range-btn').forEach(b => b.classList.remove('active'));
+          btn.classList.add('active');
+          currentDays = parseInt(btn.dataset.days);
+          loadTrendChart();
+        });
+      });
+
+      // 初始化图表
+      initCharts();
+      await loadAllData();
+
+      window.addEventListener('resize', () => {
+        [chartTrend, chartStatus, chartConsumption, chartDoctor, chartCategory, chartEfficiency].forEach(c => c && c.resize());
+      });
+    });
+
+    function initCharts() {
+      chartTrend = echarts.init(document.getElementById('chart-trend'));
+      chartStatus = echarts.init(document.getElementById('chart-status'));
+      chartConsumption = echarts.init(document.getElementById('chart-consumption'));
+      chartDoctor = echarts.init(document.getElementById('chart-doctor'));
+      chartCategory = echarts.init(document.getElementById('chart-category'));
+      chartEfficiency = echarts.init(document.getElementById('chart-efficiency'));
+    }
+
+    async function loadAllData() {
+      await Promise.all([
+        loadOverview(),
+        loadTrendChart(),
+        loadStatusChart(),
+        loadConsumptionChart(),
+        loadDoctorChart(),
+        loadCategoryChart(),
+        loadEfficiencyChart(),
+      ]);
+    }
+
+    // ===== 总览数据 =====
+    async function loadOverview() {
+      try {
+        const data = await api('GET', '/api/stats/overview');
+        document.getElementById('ov-total-rx').textContent = data.prescriptions.total;
+        document.getElementById('ov-total-amount').textContent = '¥' + data.prescriptions.totalAmount.toFixed(2);
+        document.getElementById('ov-herb-count').textContent = data.herbs.total;
+        document.getElementById('ov-herb-stock').textContent = data.herbs.totalStock;
+        document.getElementById('ov-low-stock').textContent = data.herbs.lowStock;
+      } catch(e) {}
+    }
+
+    // ===== 处方趋势图 =====
+    async function loadTrendChart() {
+      try {
+        const data = await api('GET', `/api/stats/prescription-trend?days=${currentDays}`);
+        const option = {
+          tooltip: { trigger: 'axis', axisPointer: { type: 'cross' } },
+          legend: { data: ['处方数量', '处方金额'], top: 0 },
+          grid: { left: '3%', right: '4%', bottom: '3%', containLabel: true },
+          xAxis: { type: 'category', boundaryGap: false, data: data.dates,
+            axisLine: { lineStyle: { color: '#ccc' } }, axisLabel: { color: '#666', fontSize: 11 } },
+          yAxis: [
+            { type: 'value', name: '处方数', axisLabel: { color: '#666' }, splitLine: { lineStyle: { color: '#f0f0f0' } } },
+            { type: 'value', name: '金额(元)', axisLabel: { color: '#666' }, splitLine: { show: false } }
+          ],
+          series: [
+            {
+              name: '处方数量', type: 'line', smooth: true, data: data.counts,
+              itemStyle: { color: '#2E7D32' }, lineStyle: { width: 3 },
+              areaStyle: { color: new echarts.graphic.LinearGradient(0, 0, 0, 1, [
+                { offset: 0, color: 'rgba(46,125,50,0.3)' }, { offset: 1, color: 'rgba(46,125,50,0.02)' }
+              ]) },
+              symbol: 'circle', symbolSize: 6
+            },
+            {
+              name: '处方金额', type: 'line', smooth: true, yAxisIndex: 1, data: data.amounts,
+              itemStyle: { color: '#FF9800' }, lineStyle: { width: 2, type: 'dashed' },
+              symbol: 'circle', symbolSize: 5
+            }
+          ]
+        };
+        chartTrend.setOption(option);
+      } catch(e) {}
+    }
+
+    // ===== 状态分布饼图 =====
+    async function loadStatusChart() {
+      try {
+        const data = await api('GET', '/api/stats/status-distribution');
+        const colorMap = { '待审核': '#FFC107', '已审核': '#4CAF50', '已发药': '#2196F3', '已拒绝': '#F44336' };
+        const option = {
+          tooltip: { trigger: 'item', formatter: '{b}: {c} ({d}%)' },
+          legend: { orient: 'vertical', left: 'left', top: 'middle', textStyle: { fontSize: 12 } },
+          series: [{
+            type: 'pie', radius: ['40%', '70%'], center: ['60%', '50%'],
+            avoidLabelOverlap: false,
+            itemStyle: { borderRadius: 6, borderColor: '#fff', borderWidth: 2 },
+            label: { show: true, formatter: '{b}\n{d}%', fontSize: 11 },
+            emphasis: { label: { show: true, fontSize: 14, fontWeight: 'bold' } },
+            data: data.map(d => ({ ...d, itemStyle: { color: colorMap[d.name] || '#999' } }))
+          }]
+        };
+        chartStatus.setOption(option);
+      } catch(e) {}
+    }
+
+    // ===== 药材消耗排行 =====
+    async function loadConsumptionChart() {
+      try {
+        const data = await api('GET', '/api/stats/herb-consumption');
+        const names = data.map(d => d.name).reverse();
+        const values = data.map(d => d.value).reverse();
+        const option = {
+          tooltip: { trigger: 'axis', axisPointer: { type: 'shadow' }, formatter: '{b}: {c}g' },
+          grid: { left: '3%', right: '8%', bottom: '3%', containLabel: true },
+          xAxis: { type: 'value', axisLabel: { color: '#666' }, splitLine: { lineStyle: { color: '#f0f0f0' } } },
+          yAxis: { type: 'category', data: names, axisLabel: { color: '#666', fontSize: 12 } },
+          series: [{
+            type: 'bar', data: values, barWidth: '55%',
+            itemStyle: {
+              color: new echarts.graphic.LinearGradient(0, 0, 1, 0, [
+                { offset: 0, color: '#81C784' }, { offset: 1, color: '#2E7D32' }
+              ]),
+              borderRadius: [0, 4, 4, 0]
+            },
+            label: { show: true, position: 'right', formatter: '{c}g', fontSize: 11, color: '#666' }
+          }]
+        };
+        chartConsumption.setOption(option);
+      } catch(e) {}
+    }
+
+    // ===== 医生工作量 =====
+    async function loadDoctorChart() {
+      try {
+        const data = await api('GET', '/api/stats/doctor-workload');
+        const names = data.map(d => d.name);
+        const counts = data.map(d => d.count);
+        const amounts = data.map(d => d.amount);
+        const option = {
+          tooltip: { trigger: 'axis', axisPointer: { type: 'shadow' } },
+          legend: { data: ['处方数', '处方金额'], top: 0 },
+          grid: { left: '3%', right: '4%', bottom: '3%', containLabel: true },
+          xAxis: { type: 'category', data: names, axisLabel: { color: '#666' } },
+          yAxis: [
+            { type: 'value', name: '处方数', axisLabel: { color: '#666' }, splitLine: { lineStyle: { color: '#f0f0f0' } } },
+            { type: 'value', name: '金额(元)', axisLabel: { color: '#666' }, splitLine: { show: false } }
+          ],
+          series: [
+            {
+              name: '处方数', type: 'bar', data: counts, barWidth: '35%',
+              itemStyle: { color: '#2E7D32', borderRadius: [4, 4, 0, 0] },
+              label: { show: true, position: 'top', fontSize: 11, color: '#666' }
+            },
+            {
+              name: '处方金额', type: 'line', yAxisIndex: 1, data: amounts, smooth: true,
+              itemStyle: { color: '#FF9800' }, lineStyle: { width: 2 }, symbol: 'circle', symbolSize: 8
+            }
+          ]
+        };
+        chartDoctor.setOption(option);
+      } catch(e) {}
+    }
+
+    // ===== 药材类别分布 =====
+    async function loadCategoryChart() {
+      try {
+        const data = await api('GET', '/api/stats/category-distribution');
+        const option = {
+          tooltip: { trigger: 'item', formatter: '{b}<br/>种类: {c}种 ({d}%)' },
+          legend: { orient: 'vertical', left: 'left', top: 'middle', textStyle: { fontSize: 12 } },
+          series: [{
+            type: 'pie', radius: '65%', center: ['60%', '50%'],
+            roseType: 'radius',
+            itemStyle: { borderRadius: 6, borderColor: '#fff', borderWidth: 2 },
+            label: { formatter: '{b}: {c}种', fontSize: 11 },
+            data: data.map((d, i) => ({ name: d.name, value: d.count, itemStyle: { color: GREEN_COLORS[i % GREEN_COLORS.length] } }))
+          }]
+        };
+        chartCategory.setOption(option);
+      } catch(e) {}
+    }
+
+    // ===== 处方处理效率（漏斗图） =====
+    async function loadEfficiencyChart() {
+      try {
+        const data = await api('GET', '/api/stats/overview');
+        const rx = data.prescriptions;
+        const funnelData = [
+          { value: rx.total, name: '全部处方' },
+          { value: rx.pending + rx.approved + rx.dispensed, name: '有效处方(剔除拒绝)' },
+          { value: rx.approved + rx.dispensed, name: '已审核' },
+          { value: rx.dispensed, name: '已发药' },
+        ];
+        const option = {
+          tooltip: { trigger: 'item', formatter: '{b}: {c} ({d}%)' },
+          series: [{
+            type: 'funnel', left: '10%', top: 20, bottom: 20, width: '80%',
+            min: 0, max: rx.total || 1, minSize: '20%', maxSize: '100%',
+            sort: 'descending', gap: 4,
+            label: { show: true, position: 'inside', formatter: '{b}\n{c}张', fontSize: 12, color: '#fff' },
+            labelLine: { length: 10, lineStyle: { width: 1, type: 'solid' } },
+            itemStyle: { borderColor: '#fff', borderWidth: 2 },
+            emphasis: { label: { fontSize: 14 } },
+            data: [
+              { value: funnelData[0].value, name: funnelData[0].name, itemStyle: { color: '#2E7D32' } },
+              { value: funnelData[1].value, name: funnelData[1].name, itemStyle: { color: '#43A047' } },
+              { value: funnelData[2].value, name: funnelData[2].name, itemStyle: { color: '#66BB6A' } },
+              { value: funnelData[3].value, name: funnelData[3].name, itemStyle: { color: '#A5D6A7' } },
+            ]
+          }]
+        };
+        chartEfficiency.setOption(option);
+      } catch(e) {}
+    }
+
+// ===== 初始化统一布局 =====
+initUnifiedLayout("数据看板");
+    </script>
+
+    <!-- PWA Service Worker 注册 -->
+    <script>
+    if ('serviceWorker' in navigator) {
+        window.addEventListener('load', function() {
+            navigator.serviceWorker.register('/sw.js')
+                .then(function(registration) {
+                    console.log('PWA: Service Worker 注册成功，范围:', registration.scope);
+                    
+                    // 监听更新
+                    registration.addEventListener('updatefound', function() {
+                        const newWorker = registration.installing;
+                        newWorker.addEventListener('statechange', function() {
+                            if (newWorker.state === 'installed' && navigator.serviceWorker.controller) {
+                                // 显示更新提示
+                                if (confirm('发现新版本，是否立即更新？')) {
+                                    newWorker.postMessage('SKIP_WAITING');
+                                    location.reload();
+                                }
+                            }
+                        });
+                    });
+                })
+                .catch(function(error) {
+                    console.log('PWA: Service Worker 注册失败:', error);
+                });
+        });
+    }
+    
+    // PWA 安装提示
+    let deferredPrompt;
+    window.addEventListener('beforeinstallprompt', function(e) {
+        e.preventDefault();
+        deferredPrompt = e;
+        console.log('PWA: 可以安装应用');
+        
+        // 显示安装按钮（如果有安装按钮元素）
+        const installBtn = document.getElementById('pwa-install-btn');
+        if (installBtn) {
+            installBtn.style.display = 'flex';
+            installBtn.addEventListener('click', function() {
+                if (deferredPrompt) {
+                    deferredPrompt.prompt();
+                    deferredPrompt.userChoice.then(function(choiceResult) {
+                        if (choiceResult.outcome === 'accepted') {
+                            console.log('PWA: 用户接受安装');
+                        }
+                        deferredPrompt = null;
+                        installBtn.style.display = 'none';
+                    });
+                }
+            });
+        }
+    });
+    
+    window.addEventListener('appinstalled', function() {
+        console.log('PWA: 应用已安装');
+        const installBtn = document.getElementById('pwa-install-btn');
+        if (installBtn) {
+            installBtn.style.display = 'none';
+        }
+    });
+    </script>
+
+</body>
+</html>

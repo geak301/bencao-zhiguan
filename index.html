@@ -115,6 +115,16 @@
       background-color: #226125;
     }
   </style>
+
+    <!-- PWA 支持 -->
+    <link rel="manifest" href="/manifest.json">
+    <meta name="theme-color" content="#1a365d">
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+    <meta name="apple-mobile-web-app-title" content="本草智管">
+    <link rel="apple-touch-icon" href="/icon-192x192.png">
+    <link rel="icon" type="image/x-icon" href="/favicon.ico">
+
 </head>
 <body>
   <div class="bg-herb"></div>
@@ -143,19 +153,18 @@
       <button type="button" id="login-btn" class="form-button">
         <i class="fa fa-sign-in mr-2"></i> 登录
       </button>
-      <p class="text-center text-sm text-gray-500 mt-4">
-        测试账号：admin / 123456（管理员）
-      </p>
     </div>
 
     <!-- 注册表单 -->
     <div id="register-form" class="hidden">
       <!-- 角色选择 -->
-      <div class="flex justify-center gap-3 mb-5">
-        <button class="role-tab active" data-role="admin">管理员</button>
+      <div class="flex justify-center gap-3 mb-4">
+        <button class="role-tab active" data-role="patient">患者</button>
         <button class="role-tab" data-role="doctor">医生</button>
-        <button class="role-tab" data-role="patient">病人</button>
       </div>
+      <p class="text-xs text-gray-500 text-center mb-4">
+        患者注册后立即可用；医生注册需填写执业信息，经管理员审核通过后方可使用
+      </p>
 
       <!-- 通用字段 -->
       <input type="text" id="reg-username" class="form-input" placeholder="用户名 *">
@@ -164,20 +173,15 @@
       <input type="text" id="reg-name" class="form-input" placeholder="真实姓名 *">
       <input type="text" id="reg-phone" class="form-input" placeholder="联系电话 *">
 
-      <!-- 管理员专属 -->
-      <div id="admin-fields">
-        <input type="password" id="reg-admin-key" class="form-input" placeholder="管理员注册密钥 *">
-        <p class="text-xs text-gray-500 mb-3">提示：管理员密钥需向系统管理员获取</p>
-      </div>
-
       <!-- 医生专属 -->
       <div id="doctor-fields" class="hidden">
         <input type="text" id="reg-department" class="form-input" placeholder="所属科室 *">
         <input type="text" id="reg-license" class="form-input" placeholder="执业医师证号 *">
+        <p class="text-xs text-amber-600 mb-3">⚠️ 医生账号需管理员审核通过后才能登录使用</p>
       </div>
 
       <!-- 病人专属 -->
-      <div id="patient-fields" class="hidden">
+      <div id="patient-fields">
         <div class="flex gap-3 mb-3">
           <select id="reg-gender" class="form-input" style="margin-bottom:0;">
             <option value="">性别</option>
@@ -186,12 +190,15 @@
           </select>
           <input type="number" id="reg-age" class="form-input" placeholder="年龄" style="margin-bottom:0;">
         </div>
-        <input type="text" id="reg-idcard" class="form-input" placeholder="身份证号">
+        <input type="text" id="reg-idcard" class="form-input" placeholder="身份证号（选填）">
       </div>
 
       <button type="button" id="register-btn" class="form-button mt-2">
         <i class="fa fa-user-plus mr-2"></i> 注册
       </button>
+      <p class="text-xs text-gray-400 text-center mt-3">
+        注册即表示同意《用户服务协议》和《隐私政策》
+      </p>
     </div>
   </div>
 
@@ -240,7 +247,6 @@
 
     function initRoleTabs() {
       const roleTabs = document.querySelectorAll('.role-tab');
-      const adminFields = document.getElementById('admin-fields');
       const doctorFields = document.getElementById('doctor-fields');
       const patientFields = document.getElementById('patient-fields');
 
@@ -250,11 +256,9 @@
           tab.classList.add('active');
 
           const role = tab.dataset.role;
-          adminFields.classList.add('hidden');
           doctorFields.classList.add('hidden');
           patientFields.classList.add('hidden');
 
-          if (role === 'admin') adminFields.classList.remove('hidden');
           if (role === 'doctor') doctorFields.classList.remove('hidden');
           if (role === 'patient') patientFields.classList.remove('hidden');
         });
@@ -305,10 +309,7 @@
 
       const userData = { username, password, name, phone, role: currentRole };
 
-      if (currentRole === 'admin') {
-        const adminKey = document.getElementById('reg-admin-key').value;
-        userData.adminKey = adminKey;
-      } else if (currentRole === 'doctor') {
+      if (currentRole === 'doctor') {
         const department = document.getElementById('reg-department').value.trim();
         const license = document.getElementById('reg-license').value.trim();
         if (!department || !license) {
@@ -324,10 +325,15 @@
       }
 
       try {
-        await api('POST', '/api/register', userData);
-        alert('注册成功！请使用账号登录');
-        document.getElementById('login-tab').click();
-        document.getElementById('login-username').value = username;
+        const result = await api('POST', '/api/register', userData);
+        if (currentRole === 'patient') {
+          alert('注册成功！请使用账号登录');
+          document.getElementById('login-tab').click();
+          document.getElementById('login-username').value = username;
+        } else {
+          alert('注册成功！您的医生账号正在审核中，请等待管理员审核通过后再登录。\n审核期间您可以先浏览平台公开信息。');
+          // 医生注册后不自动跳转，留在注册页
+        }
       } catch (e) {
         alert(e.message || '注册失败');
       }
@@ -339,5 +345,69 @@
       }
     }
   </script>
+
+    <!-- PWA Service Worker 注册 -->
+    <script>
+    if ('serviceWorker' in navigator) {
+        window.addEventListener('load', function() {
+            navigator.serviceWorker.register('/sw.js')
+                .then(function(registration) {
+                    console.log('PWA: Service Worker 注册成功，范围:', registration.scope);
+                    
+                    // 监听更新
+                    registration.addEventListener('updatefound', function() {
+                        const newWorker = registration.installing;
+                        newWorker.addEventListener('statechange', function() {
+                            if (newWorker.state === 'installed' && navigator.serviceWorker.controller) {
+                                // 显示更新提示
+                                if (confirm('发现新版本，是否立即更新？')) {
+                                    newWorker.postMessage('SKIP_WAITING');
+                                    location.reload();
+                                }
+                            }
+                        });
+                    });
+                })
+                .catch(function(error) {
+                    console.log('PWA: Service Worker 注册失败:', error);
+                });
+        });
+    }
+    
+    // PWA 安装提示
+    let deferredPrompt;
+    window.addEventListener('beforeinstallprompt', function(e) {
+        e.preventDefault();
+        deferredPrompt = e;
+        console.log('PWA: 可以安装应用');
+        
+        // 显示安装按钮（如果有安装按钮元素）
+        const installBtn = document.getElementById('pwa-install-btn');
+        if (installBtn) {
+            installBtn.style.display = 'flex';
+            installBtn.addEventListener('click', function() {
+                if (deferredPrompt) {
+                    deferredPrompt.prompt();
+                    deferredPrompt.userChoice.then(function(choiceResult) {
+                        if (choiceResult.outcome === 'accepted') {
+                            console.log('PWA: 用户接受安装');
+                        }
+                        deferredPrompt = null;
+                        installBtn.style.display = 'none';
+                    });
+                }
+            });
+        }
+    });
+    
+    window.addEventListener('appinstalled', function() {
+        console.log('PWA: 应用已安装');
+        const installBtn = document.getElementById('pwa-install-btn');
+        if (installBtn) {
+            installBtn.style.display = 'none';
+        }
+    });
+    </script>
+
 </body>
 </html>

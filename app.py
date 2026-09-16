@@ -239,12 +239,21 @@ def add_herb():
         return fail("请填写药材编码和名称")
     if query("SELECT 1 FROM herbs WHERE code = %s", (code,), one=True):
         return fail("已存在相同编码的药材")
+    init_qty = d.get("quantity", 0) or 0
     execute(
         """INSERT INTO herbs (code, name, category, origin, storage, unit, price, quantity, warning_threshold, description)
            VALUES (%s,%s,%s,%s,%s,%s,%s,%s,%s,%s)""",
         (code, name, d.get("category"), d.get("origin"), d.get("storage"), d.get("unit"),
-         d.get("price", 0), d.get("quantity", 0), d.get("warningThreshold", 200), d.get("description")),
+         d.get("price", 0), init_qty, d.get("warningThreshold", 200), d.get("description")),
     )
+    # 带初始库存的新建药材，自动记一条期初入库流水
+    if init_qty and int(init_qty) != 0:
+        add_stock_transaction(
+            code, name, "in", abs(int(init_qty)),
+            reference_type="adjust", reference_id=None,
+            remark="新建药材期初入库",
+            operator=user["username"], operator_name=user["name"],
+        )
     return ok(None, "药材添加成功")
 
 
@@ -259,15 +268,67 @@ def update_herb(code):
     old = query("SELECT * FROM herbs WHERE code = %s", (code,), one=True)
     if not old:
         return fail("药材不存在")
+    new_qty = d.get("quantity", old["quantity"])
     execute(
         """UPDATE herbs SET name=%s, category=%s, origin=%s, storage=%s, unit=%s,
            price=%s, quantity=%s, warning_threshold=%s, description=%s WHERE code=%s""",
         (d.get("name", old["name"]), d.get("category", old["category"]), d.get("origin", old["origin"]),
          d.get("storage", old["storage"]), d.get("unit", old["unit"]),
-         d.get("price", old["price"]), d.get("quantity", old["quantity"]),
+         d.get("price", old["price"]), new_qty,
          d.get("warningThreshold", old["warning_threshold"]), d.get("description", old["description"]), code),
     )
+    # 编辑时改了库存数量，记一条调整流水
+    try:
+        delta = int(new_qty) - int(old["quantity"] or 0)
+    except Exception:
+        delta = 0
+    if delta != 0:
+        add_stock_transaction(
+            code, old["name"], "in" if delta > 0 else "out",
+            abs(delta), reference_type="adjust", reference_id=None,
+            remark="编辑调整库存 %s -> %s" % (int(old["quantity"] or 0), int(new_qty)),
+            operator=user["username"], operator_name=user["name"],
+        )
     return ok(None, "药材更新成功")
+
+
+@app.route("/api/herbs/<code>/adjust", methods=["POST"])
+def adjust_herb(code):
+    user, err = require_login()
+    if err:
+        return err
+    if user["role"] == "patient":
+        return fail("无权限：病人角色为只读", code=403, http=403)
+    d = request.get_json(silent=True) or {}
+    try:
+        amount = int(d.get("amount", 0))
+    except (TypeError, ValueError):
+        return fail("调整数量不合法")
+    if amount == 0:
+        return fail("调整数量不能为 0")
+    herb = query("SELECT * FROM herbs WHERE code = %s", (code,), one=True)
+    if not herb:
+        return fail("药材不存在")
+    before = int(herb["quantity"] or 0)
+    if before + amount < 0:
+        return fail("库存不足：当前 %s，不能减 %s" % (before, -amount))
+    affected, _ = execute(
+        "UPDATE herbs SET quantity = quantity + %s WHERE code = %s AND quantity + %s >= 0",
+        (amount, code, amount),
+    )
+    if affected != 1:
+        return fail("库存调整失败")
+    after = before + amount
+    add_stock_transaction(
+        code, herb["name"], "in" if amount > 0 else "out",
+        abs(amount), reference_type="adjust", reference_id=None,
+        remark="人工调库 %+d（%s -> %s）" % (amount, before, after),
+        operator=user["username"], operator_name=user["name"],
+    )
+    add_log(code, herb["name"], "herb_adjust",
+            {"before": before, "after": after, "amount": amount},
+            user["username"], user["name"])
+    return ok({"quantity": after}, "库存调整成功")
 
 
 @app.route("/api/herbs/<code>", methods=["DELETE"])

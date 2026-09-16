@@ -523,6 +523,21 @@ def _init_sqlite():
                      h["price"], h["quantity"], h["warning_threshold"], h["description"]))
     print(f"  {len(SAMPLE_HERBS)} 种药材就绪")
 
+    print("[3b] 写入期初库存流水 ...")
+    existing_tx = query("SELECT COUNT(*) AS c FROM stock_transactions", one=True)
+    if not existing_tx or existing_tx["c"] == 0:
+        for h in SAMPLE_HERBS:
+            execute("""INSERT INTO stock_transactions
+                (herb_code,herb_name,type,quantity,balance_after,reference_type,reference_id,
+                 remark,operator,operator_name,created_at)
+                VALUES (?,?,?,?,?,?,?,?,?,?,?)""",
+                (h["code"], h["name"], "in", h["quantity"], h["quantity"],
+                 "initial", None, "系统建账期初库存", "system", "系统",
+                 time.strftime("%Y/%m/%d %H:%M:%S")))
+        print(f"  {len(SAMPLE_HERBS)} 条期初流水就绪")
+    else:
+        print("  已有流水记录，跳过期初初始化")
+
     print("[4/8] 写入示例供应商 ...")
     for s in SAMPLE_SUPPLIERS:
         existing = query("SELECT id FROM suppliers WHERE name = ?", (s["name"],), one=True)
@@ -774,6 +789,21 @@ def _init_mysql():
                     (h["code"], h["name"], h["category"], h["origin"], h["storage"], h["unit"],
                      h["price"], h["quantity"], h["warning_threshold"], h["description"]))
             print(f"  {len(SAMPLE_HERBS)} 种药材就绪")
+
+            print("[3b] 写入期初库存流水 ...")
+            cur.execute("SELECT COUNT(*) FROM stock_transactions")
+            if cur.fetchone()[0] == 0:
+                for h in SAMPLE_HERBS:
+                    cur.execute("""INSERT INTO stock_transactions
+                        (herb_code,herb_name,type,quantity,balance_after,reference_type,reference_id,
+                         remark,operator,operator_name,created_at)
+                        VALUES (%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s)""",
+                        (h["code"], h["name"], "in", h["quantity"], h["quantity"],
+                         "initial", None, "系统建账期初库存", "system", "系统",
+                         time.strftime("%Y/%m/%d %H:%M:%S")))
+                print(f"  {len(SAMPLE_HERBS)} 条期初流水就绪")
+            else:
+                print("  已有流水记录，跳过期初初始化")
 
             print("[4/8] 写入示例供应商 ...")
             count = 0

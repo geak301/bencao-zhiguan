@@ -488,6 +488,8 @@ tailwind.config = {
       userTableBody.addEventListener('click', async (e) => {
         const editBtn = e.target.closest('.edit-user-btn');
         const deleteBtn = e.target.closest('.delete-user-btn');
+        const approveBtn = e.target.closest('.approve-user-btn');
+        const rejectBtn = e.target.closest('.reject-user-btn');
 
         if (editBtn) {
           const userId = editBtn.getAttribute('data-id');
@@ -526,6 +528,32 @@ tailwind.config = {
           currentUserId = userId;
           deleteUserMessage.textContent = `您确定要删除用户 "${userId}"（${user.name || ''}）吗？此操作不可撤销。`;
           deleteUserModal.classList.remove('hidden');
+        }
+
+        if (approveBtn) {
+          const userId = approveBtn.getAttribute('data-id');
+          const userName = approveBtn.getAttribute('data-name') || userId;
+          if (!confirm(`确定通过用户 "${userName}"（${userId}）的注册申请吗？`)) return;
+          try {
+            await api('POST', '/api/users/' + encodeURIComponent(userId) + '/approve');
+            alert('已通过：用户 "' + userName + '" 已激活');
+            await renderUserTable();
+          } catch (err) {
+            alert(err.message || '操作失败');
+          }
+        }
+
+        if (rejectBtn) {
+          const userId = rejectBtn.getAttribute('data-id');
+          const userName = rejectBtn.getAttribute('data-name') || userId;
+          if (!confirm(`确定拒绝用户 "${userName}"（${userId}）的注册申请吗？该用户将被删除。`)) return;
+          try {
+            await api('POST', '/api/users/' + encodeURIComponent(userId) + '/reject', {});
+            alert('已拒绝：用户 "' + userName + '" 的申请已被驳回');
+            await renderUserTable();
+          } catch (err) {
+            alert(err.message || '操作失败');
+          }
         }
       });
 

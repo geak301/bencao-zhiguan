@@ -252,7 +252,7 @@ tailwind.config = {
 
 const API_BASE = '';
     async function api(method, url, body) {
-      const opts = { method: method, headers: { 'Content-Type': 'application/json', 'X-User': sessionStorage.getItem('current_user') || '' } };
+      const opts = { method: method, headers: { 'Content-Type': 'application/json', 'X-User': encodeURIComponent(sessionStorage.getItem('current_user') || '') } };
       if (body !== undefined) opts.body = JSON.stringify(body);
       const resp = await fetch(API_BASE + url, opts);
       const result = await resp.json().catch(() => ({ code: -1, message: '服务器连接失败' }));

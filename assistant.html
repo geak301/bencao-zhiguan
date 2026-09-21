@@ -265,7 +265,7 @@
                 method: method,
                 headers: {
                     'Content-Type': 'application/json',
-                    'X-User': sessionStorage.getItem('current_user') || ''
+                    'X-User': encodeURIComponent(sessionStorage.getItem('current_user') || '')
                 }
             };
             if (body !== undefined) opts.body = JSON.stringify(body);

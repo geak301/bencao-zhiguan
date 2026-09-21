@@ -1,4 +1,5 @@
 import re
+from urllib.parse import unquote
 # -*- coding: utf-8 -*-
 """
 本草智管平台 - 后端服务（Flask + MySQL）
@@ -42,7 +43,7 @@ def fail(message, code=1, http=200):
 
 
 def get_current_user():
-    username = request.headers.get("X-User", "").strip()
+    username = unquote(request.headers.get("X-User", "")).strip()
     if not username:
         return None
     return query("SELECT * FROM users WHERE username = %s", (username,), one=True)

@@ -14,9 +14,6 @@ BASE_DIR = os.path.dirname(os.path.abspath(__file__))
 SQLITE_DB_PATH = os.path.join(BASE_DIR, "herb_management.db")
 
 _use_mysql = os.environ.get("USE_MYSQL", "").strip().lower() in ("1", "true", "yes")
-# 自动检测 Railway MySQL 环境变量
-if not _use_mysql and os.environ.get("MYSQLHOST"):
-    _use_mysql = True
 _mysql_available = False
 
 if _use_mysql:
@@ -75,7 +72,6 @@ def get_conn():
         # 优先用 MYSQL_URL 解析（Railway MySQL 自动提供）
         mysql_url = os.environ.get("MYSQL_URL") or os.environ.get("MYSQL_PUBLIC_URL")
         if mysql_url:
-            # 解析 mysql://user:password@host:port/database
             parsed = urllib.parse.urlparse(mysql_url)
             cfg = {
                 "host": parsed.hostname,

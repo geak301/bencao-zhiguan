@@ -618,17 +618,31 @@ def _init_sqlite():
 def _init_mysql():
     """MySQL 模式初始化（兼容 Railway MySQL 环境变量）"""
     import pymysql
-    conn_cfg = {
-        "host": os.environ.get("DB_HOST") or os.environ.get("MYSQLHOST") or "127.0.0.1",
-        "port": int(os.environ.get("DB_PORT") or os.environ.get("MYSQLPORT") or "3306"),
-        "user": os.environ.get("DB_USER") or os.environ.get("MYSQLUSER") or "root",
-        "password": os.environ.get("DB_PASSWORD") or os.environ.get("MYSQLPASSWORD") or "",
-        "charset": "utf8mb4",
-    }
+    import urllib.parse
+    # 优先用 MYSQL_URL 解析（Railway MySQL 自动提供）
+    mysql_url = os.environ.get("MYSQL_URL") or os.environ.get("MYSQL_PUBLIC_URL")
+    if mysql_url:
+        parsed = urllib.parse.urlparse(mysql_url)
+        conn_cfg = {
+            "host": parsed.hostname,
+            "port": parsed.port or 3306,
+            "user": parsed.username,
+            "password": parsed.password,
+            "charset": "utf8mb4",
+        }
+        db_name = parsed.path.lstrip("/") or DB_NAME
+    else:
+        conn_cfg = {
+            "host": os.environ.get("DB_HOST") or os.environ.get("MYSQLHOST") or "127.0.0.1",
+            "port": int(os.environ.get("DB_PORT") or os.environ.get("MYSQLPORT") or "3306"),
+            "user": os.environ.get("DB_USER") or os.environ.get("MYSQLUSER") or "root",
+            "password": os.environ.get("DB_PASSWORD") or os.environ.get("MYSQLPASSWORD") or "",
+            "charset": "utf8mb4",
+        }
+        db_name = DB_NAME or os.environ.get("MYSQLDATABASE") or "bencao_zhiguan"
     conn = pymysql.connect(**conn_cfg)
     try:
         with conn.cursor() as cur:
-            db_name = DB_NAME or os.environ.get("MYSQLDATABASE") or "bencao_zhiguan"
             cur.execute(f"CREATE DATABASE IF NOT EXISTS {db_name} DEFAULT CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci")
             cur.execute(f"USE {db_name}")
             # 建表（MySQL 语法）

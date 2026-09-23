@@ -72,15 +72,30 @@ class DictCursorSqlite:
 def get_conn():
     if is_mysql():
         import pymysql
-        cfg = {
-            "host": os.environ.get("DB_HOST") or os.environ.get("MYSQLHOST") or "127.0.0.1",
-            "port": int(os.environ.get("DB_PORT") or os.environ.get("MYSQLPORT") or "3306"),
-            "user": os.environ.get("DB_USER") or os.environ.get("MYSQLUSER") or "root",
-            "password": os.environ.get("DB_PASSWORD") or os.environ.get("MYSQLPASSWORD") or "",
-            "database": os.environ.get("DB_NAME") or os.environ.get("MYSQLDATABASE") or "herb_management_system",
-            "charset": "utf8mb4",
-            "cursorclass": pymysql.cursors.DictCursor,
-        }
+        # 优先用 MYSQL_URL 解析（Railway MySQL 自动提供）
+        mysql_url = os.environ.get("MYSQL_URL") or os.environ.get("MYSQL_PUBLIC_URL")
+        if mysql_url:
+            # 解析 mysql://user:password@host:port/database
+            parsed = urllib.parse.urlparse(mysql_url)
+            cfg = {
+                "host": parsed.hostname,
+                "port": parsed.port or 3306,
+                "user": parsed.username,
+                "password": parsed.password,
+                "database": parsed.path.lstrip("/"),
+                "charset": "utf8mb4",
+                "cursorclass": pymysql.cursors.DictCursor,
+            }
+        else:
+            cfg = {
+                "host": os.environ.get("DB_HOST") or os.environ.get("MYSQLHOST") or "127.0.0.1",
+                "port": int(os.environ.get("DB_PORT") or os.environ.get("MYSQLPORT") or "3306"),
+                "user": os.environ.get("DB_USER") or os.environ.get("MYSQLUSER") or "root",
+                "password": os.environ.get("DB_PASSWORD") or os.environ.get("MYSQLPASSWORD") or "",
+                "database": os.environ.get("DB_NAME") or os.environ.get("MYSQLDATABASE") or "herb_management_system",
+                "charset": "utf8mb4",
+                "cursorclass": pymysql.cursors.DictCursor,
+            }
         return pymysql.connect(**cfg)
     else:
         conn = sqlite3.connect(SQLITE_DB_PATH)

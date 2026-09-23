@@ -13,7 +13,7 @@ import time
 
 from db import is_mysql, execute, query, SQLITE_DB_PATH
 
-DB_NAME = "herb_management_system"
+DB_NAME = os.environ.get("DB_NAME") or os.environ.get("MYSQLDATABASE") or "herb_management_system"
 
 
 # ============ SQLite 建表语句 ============
@@ -616,20 +616,21 @@ def _init_sqlite():
 
 
 def _init_mysql():
-    """MySQL 模式初始化（保留原逻辑）"""
+    """MySQL 模式初始化（兼容 Railway MySQL 环境变量）"""
     import pymysql
     conn_cfg = {
-        "host": os.environ.get("DB_HOST", "127.0.0.1"),
-        "port": int(os.environ.get("DB_PORT", "3306")),
-        "user": os.environ.get("DB_USER", "root"),
-        "password": os.environ.get("DB_PASSWORD", ""),
+        "host": os.environ.get("DB_HOST") or os.environ.get("MYSQLHOST") or "127.0.0.1",
+        "port": int(os.environ.get("DB_PORT") or os.environ.get("MYSQLPORT") or "3306"),
+        "user": os.environ.get("DB_USER") or os.environ.get("MYSQLUSER") or "root",
+        "password": os.environ.get("DB_PASSWORD") or os.environ.get("MYSQLPASSWORD") or "",
         "charset": "utf8mb4",
     }
     conn = pymysql.connect(**conn_cfg)
     try:
         with conn.cursor() as cur:
-            cur.execute(f"CREATE DATABASE IF NOT EXISTS {DB_NAME} DEFAULT CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci")
-            cur.execute(f"USE {DB_NAME}")
+            db_name = DB_NAME or os.environ.get("MYSQLDATABASE") or "bencao_zhiguan"
+            cur.execute(f"CREATE DATABASE IF NOT EXISTS {db_name} DEFAULT CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci")
+            cur.execute(f"USE {db_name}")
             # 建表（MySQL 语法）
             mysql_tables = [
                 """CREATE TABLE IF NOT EXISTS users (

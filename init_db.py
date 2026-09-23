@@ -87,7 +87,7 @@ SQLITE_TABLES = [
         herb_code TEXT,
         herb_name TEXT NOT NULL,
         dosage TEXT,
-        `usage` TEXT,
+        usage TEXT,
         quantity INTEGER DEFAULT 1,
         price REAL DEFAULT 0,
         subtotal REAL DEFAULT 0
@@ -168,7 +168,7 @@ SQLITE_TABLES = [
         effects TEXT,
         indications TEXT,
         dosage TEXT,
-        `usage` TEXT,
+        usage TEXT,
         contraindications TEXT,
         compatibility TEXT,
         storage TEXT,
@@ -183,7 +183,7 @@ SQLITE_TABLES = [
         composition TEXT,
         effects TEXT,
         indications TEXT,
-        `usage` TEXT,
+        usage TEXT,
         contraindications TEXT,
         created_at TEXT DEFAULT (datetime('now','localtime'))
     )""",
@@ -523,21 +523,6 @@ def _init_sqlite():
                      h["price"], h["quantity"], h["warning_threshold"], h["description"]))
     print(f"  {len(SAMPLE_HERBS)} 种药材就绪")
 
-    print("[3b] 写入期初库存流水 ...")
-    existing_tx = query("SELECT COUNT(*) AS c FROM stock_transactions", one=True)
-    if not existing_tx or existing_tx["c"] == 0:
-        for h in SAMPLE_HERBS:
-            execute("""INSERT INTO stock_transactions
-                (herb_code,herb_name,type,quantity,balance_after,reference_type,reference_id,
-                 remark,operator,operator_name,created_at)
-                VALUES (?,?,?,?,?,?,?,?,?,?,?)""",
-                (h["code"], h["name"], "in", h["quantity"], h["quantity"],
-                 "initial", None, "系统建账期初库存", "system", "系统",
-                 time.strftime("%Y/%m/%d %H:%M:%S")))
-        print(f"  {len(SAMPLE_HERBS)} 条期初流水就绪")
-    else:
-        print("  已有流水记录，跳过期初初始化")
-
     print("[4/8] 写入示例供应商 ...")
     for s in SAMPLE_SUPPLIERS:
         existing = query("SELECT id FROM suppliers WHERE name = ?", (s["name"],), one=True)
@@ -592,7 +577,7 @@ def _init_sqlite():
             dosage_val = float(str(item["dosage"]).replace("g", ""))
             subtotal = round(dosage_val * item["quantity"] * item["price"], 2)
             execute("""INSERT INTO prescription_items
-                (prescription_id,herb_code,herb_name,dosage, `usage`,quantity,price,subtotal)
+                (prescription_id,herb_code,herb_name,dosage,usage,quantity,price,subtotal)
                 VALUES (?,?,?,?,?,?,?,?)""",
                 (rx_id, item["herb_code"], item["herb_name"], item["dosage"],
                  item["usage"], item["quantity"], item["price"], subtotal))
@@ -607,7 +592,7 @@ def _init_sqlite():
             continue
         execute("""INSERT INTO herb_knowledge
             (herb_code,herb_name,category,nature,flavor,meridian,effects,indications,
-             dosage, `usage`,contraindications,compatibility)
+             dosage,usage,contraindications,compatibility)
             VALUES (?,?,?,?,?,?,?,?,?,?,?,?)""",
             (k["herb_code"], k["herb_name"], k["category"], k["nature"], k["flavor"],
              k["meridian"], k["effects"], k["indications"], k["dosage"], k["usage"],
@@ -622,7 +607,7 @@ def _init_sqlite():
         if existing:
             continue
         execute("""INSERT INTO formulas
-            (name,category,source,composition,effects,indications, `usage`,contraindications)
+            (name,category,source,composition,effects,indications,usage,contraindications)
             VALUES (?,?,?,?,?,?,?,?)""",
             (f["name"], f["category"], f["source"], f["composition"], f["effects"],
              f["indications"], f["usage"], f["contraindications"]))
@@ -631,29 +616,22 @@ def _init_sqlite():
 
 
 def _init_mysql():
-    """MySQL 模式初始化（12 张表 + 完整示例数据，幂等可重复执行）"""
+    """MySQL 模式初始化（保留原逻辑）"""
     import pymysql
-    from db import _get_mysql_cfg
-
-    cfg = _get_mysql_cfg()
-    # 平台托管数据库（DATABASE_URL / MYSQL_URL / MYSQLHOST）已存在库，直接连接；
-    # 本机默认模式才需要 CREATE DATABASE
-    paas = bool(os.environ.get("DATABASE_URL", "").strip() or
-                os.environ.get("MYSQL_URL", "").strip() or
-                os.environ.get("MYSQLHOST", "").strip())
-    database = cfg.get("database") or DB_NAME
-
-    conn_cfg = {k: v for k, v in cfg.items() if k in ("host", "port", "user", "password", "charset")}
+    conn_cfg = {
+        "host": os.environ.get("DB_HOST", "127.0.0.1"),
+        "port": int(os.environ.get("DB_PORT", "3306")),
+        "user": os.environ.get("DB_USER", "root"),
+        "password": os.environ.get("DB_PASSWORD", ""),
+        "charset": "utf8mb4",
+    }
     conn = pymysql.connect(**conn_cfg)
     try:
         with conn.cursor() as cur:
-            if not paas:
-                cur.execute(f"CREATE DATABASE IF NOT EXISTS `{database}` DEFAULT CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci")
-            cur.execute(f"USE `{database}`")
-
-            print("[1/8] 创建数据表 ...")
+            cur.execute(f"CREATE DATABASE IF NOT EXISTS {DB_NAME} DEFAULT CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci")
+            cur.execute(f"USE {DB_NAME}")
+            # 建表（MySQL 语法）
             mysql_tables = [
-                # 用户表
                 """CREATE TABLE IF NOT EXISTS users (
                     username VARCHAR(50) NOT NULL PRIMARY KEY, password VARCHAR(64) NOT NULL,
                     role VARCHAR(20) NOT NULL DEFAULT 'patient', name VARCHAR(50) NOT NULL,
@@ -661,24 +639,19 @@ def _init_mysql():
                     department VARCHAR(50), license VARCHAR(50), gender VARCHAR(10),
                     age INT, idcard VARCHAR(30), create_time VARCHAR(50)
                 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4""",
-                # 药材表
                 """CREATE TABLE IF NOT EXISTS herbs (
                     code VARCHAR(50) NOT NULL PRIMARY KEY, name VARCHAR(50) NOT NULL,
                     category VARCHAR(50), origin VARCHAR(100), storage VARCHAR(100),
                     unit VARCHAR(20), price DECIMAL(10,2), quantity INT DEFAULT 0,
                     warning_threshold INT DEFAULT 200, description TEXT,
                     created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
-                    updated_at DATETIME DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
-                    INDEX idx_h_name (name), INDEX idx_h_category (category)
+                    updated_at DATETIME DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
                 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4""",
-                # 操作日志表
                 """CREATE TABLE IF NOT EXISTS operation_logs (
                     id INT AUTO_INCREMENT PRIMARY KEY, herb_code VARCHAR(50), herb_name VARCHAR(50),
                     action VARCHAR(20) NOT NULL, changes JSON, operator VARCHAR(50), operator_name VARCHAR(50),
-                    timestamp BIGINT, time_str VARCHAR(50),
-                    INDEX idx_log_herb (herb_code)
+                    timestamp BIGINT, time_str VARCHAR(50)
                 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4""",
-                # 处方主表
                 """CREATE TABLE IF NOT EXISTS prescriptions (
                     id INT AUTO_INCREMENT PRIMARY KEY, prescription_no VARCHAR(50) NOT NULL UNIQUE,
                     patient_name VARCHAR(50) NOT NULL, patient_phone VARCHAR(30), patient_gender VARCHAR(10),
@@ -689,162 +662,37 @@ def _init_mysql():
                     dispenser_name VARCHAR(50), dispense_time VARCHAR(50),
                     created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
                     updated_at DATETIME DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
-                    INDEX idx_rx_status (status), INDEX idx_rx_doctor (doctor_username), INDEX idx_rx_patient (patient_name)
+                    INDEX idx_status (status), INDEX idx_doctor (doctor_username), INDEX idx_patient (patient_name)
                 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4""",
-                # 处方明细表
                 """CREATE TABLE IF NOT EXISTS prescription_items (
                     id INT AUTO_INCREMENT PRIMARY KEY, prescription_id INT NOT NULL,
                     herb_code VARCHAR(50), herb_name VARCHAR(50) NOT NULL, dosage VARCHAR(30),
-                    `usage` VARCHAR(100), quantity INT DEFAULT 1, price DECIMAL(10,2) DEFAULT 0,
-                    subtotal DECIMAL(10,2) DEFAULT 0, INDEX idx_item_rx (prescription_id)
-                ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4""",
-                # 供应商表
-                """CREATE TABLE IF NOT EXISTS suppliers (
-                    id INT AUTO_INCREMENT PRIMARY KEY, name VARCHAR(100) NOT NULL,
-                    contact_person VARCHAR(50), phone VARCHAR(30), address VARCHAR(200),
-                    description TEXT, status VARCHAR(20) DEFAULT 'active',
-                    created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
-                    INDEX idx_sup_name (name)
-                ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4""",
-                # 采购单主表
-                """CREATE TABLE IF NOT EXISTS purchase_orders (
-                    id INT AUTO_INCREMENT PRIMARY KEY, order_no VARCHAR(50) NOT NULL UNIQUE,
-                    supplier_id INT, supplier_name VARCHAR(100),
-                    total_amount DECIMAL(10,2) DEFAULT 0,
-                    status VARCHAR(20) NOT NULL DEFAULT 'pending', remark TEXT,
-                    creator VARCHAR(50), creator_name VARCHAR(50),
-                    auditor VARCHAR(50), auditor_name VARCHAR(50), audit_time VARCHAR(50),
-                    in_stock_time VARCHAR(50),
-                    created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
-                    updated_at DATETIME DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
-                    INDEX idx_po_status (status), INDEX idx_po_supplier (supplier_id)
-                ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4""",
-                # 采购明细表
-                """CREATE TABLE IF NOT EXISTS purchase_items (
-                    id INT AUTO_INCREMENT PRIMARY KEY, purchase_id INT NOT NULL,
-                    herb_code VARCHAR(50), herb_name VARCHAR(50) NOT NULL,
-                    quantity INT DEFAULT 0, unit VARCHAR(20), price DECIMAL(10,2) DEFAULT 0,
-                    subtotal DECIMAL(10,2) DEFAULT 0, received_quantity INT DEFAULT 0,
-                    INDEX idx_pi_purchase (purchase_id)
-                ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4""",
-                # 库存流水表
-                """CREATE TABLE IF NOT EXISTS stock_transactions (
-                    id INT AUTO_INCREMENT PRIMARY KEY, herb_code VARCHAR(50) NOT NULL,
-                    herb_name VARCHAR(50) NOT NULL, type VARCHAR(20) NOT NULL,
-                    quantity INT NOT NULL, balance_after INT,
-                    reference_type VARCHAR(30), reference_id VARCHAR(50),
-                    remark TEXT, operator VARCHAR(50), operator_name VARCHAR(50),
-                    created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
-                    INDEX idx_st_herb (herb_code), INDEX idx_st_type (type)
-                ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4""",
-                # 药材知识库表
-                """CREATE TABLE IF NOT EXISTS herb_knowledge (
-                    id INT AUTO_INCREMENT PRIMARY KEY, herb_code VARCHAR(50),
-                    herb_name VARCHAR(50) NOT NULL, category VARCHAR(50),
-                    nature VARCHAR(50), flavor VARCHAR(50), meridian VARCHAR(100),
-                    effects TEXT, indications TEXT, dosage TEXT, `usage` TEXT,
-                    contraindications TEXT, compatibility TEXT, storage TEXT,
-                    created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
-                    INDEX idx_hk_name (herb_name)
-                ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4""",
-                # 方剂库表
-                """CREATE TABLE IF NOT EXISTS formulas (
-                    id INT AUTO_INCREMENT PRIMARY KEY, name VARCHAR(100) NOT NULL,
-                    category VARCHAR(50), source VARCHAR(100),
-                    composition TEXT, effects TEXT, indications TEXT, `usage` TEXT,
-                    contraindications TEXT,
-                    created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
-                    INDEX idx_f_name (name)
-                ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4""",
-                # 对话历史表
-                """CREATE TABLE IF NOT EXISTS chat_history (
-                    id INT AUTO_INCREMENT PRIMARY KEY, username VARCHAR(50),
-                    role VARCHAR(20), user_message TEXT, assistant_reply TEXT,
-                    intent VARCHAR(30),
-                    created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
-                    INDEX idx_ch_user (username)
+                    usage VARCHAR(100), quantity INT DEFAULT 1, price DECIMAL(10,2) DEFAULT 0,
+                    subtotal DECIMAL(10,2) DEFAULT 0, INDEX idx_prescription (prescription_id)
                 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4""",
             ]
             for sql in mysql_tables:
                 cur.execute(sql)
-            print("  12 张表 + 索引创建完成")
+            print("  5张表创建完成")
 
-            print("[2/8] 写入默认账号 ...")
+            # 写入默认数据（复用 SQLite 的数据，用 MySQL 语法）
+            print("[2/4] 写入默认账号 ...")
             for u in DEFAULT_USERS:
                 cur.execute("""INSERT INTO users (username,password,role,name,phone,status,department,license,gender,age,idcard,create_time)
                     VALUES (%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s)
-                    ON DUPLICATE KEY UPDATE password=VALUES(password), role=VALUES(role), name=VALUES(name),
-                    phone=VALUES(phone), status=VALUES(status)""",
+                    ON DUPLICATE KEY UPDATE password=VALUES(password), role=VALUES(role), name=VALUES(name)""",
                     (u["username"], sha256_pwd(u["password"]), u["role"], u["name"], u["phone"],
-                     u["status"], u["department"], u["license"], u["gender"], u["age"],
-                     u["idcard"], u["create_time"]))
-            print(f"  {len(DEFAULT_USERS)} 个账号就绪")
+                     u["status"], u["department"], u["license"], u["gender"], u["age"], u["idcard"], u["create_time"]))
 
-            print("[3/8] 写入示例药材 ...")
+            print("[3/4] 写入示例药材 ...")
             for h in SAMPLE_HERBS:
                 cur.execute("""INSERT INTO herbs (code,name,category,origin,storage,unit,price,quantity,warning_threshold,description)
                     VALUES (%s,%s,%s,%s,%s,%s,%s,%s,%s,%s)
-                    ON DUPLICATE KEY UPDATE name=VALUES(name), category=VALUES(category),
-                    price=VALUES(price), quantity=VALUES(quantity)""",
+                    ON DUPLICATE KEY UPDATE name=VALUES(name), quantity=VALUES(quantity)""",
                     (h["code"], h["name"], h["category"], h["origin"], h["storage"], h["unit"],
                      h["price"], h["quantity"], h["warning_threshold"], h["description"]))
-            print(f"  {len(SAMPLE_HERBS)} 种药材就绪")
 
-            print("[3b] 写入期初库存流水 ...")
-            cur.execute("SELECT COUNT(*) FROM stock_transactions")
-            if cur.fetchone()[0] == 0:
-                for h in SAMPLE_HERBS:
-                    cur.execute("""INSERT INTO stock_transactions
-                        (herb_code,herb_name,type,quantity,balance_after,reference_type,reference_id,
-                         remark,operator,operator_name,created_at)
-                        VALUES (%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s)""",
-                        (h["code"], h["name"], "in", h["quantity"], h["quantity"],
-                         "initial", None, "系统建账期初库存", "system", "系统",
-                         time.strftime("%Y/%m/%d %H:%M:%S")))
-                print(f"  {len(SAMPLE_HERBS)} 条期初流水就绪")
-            else:
-                print("  已有流水记录，跳过期初初始化")
-
-            print("[4/8] 写入示例供应商 ...")
-            count = 0
-            for s in SAMPLE_SUPPLIERS:
-                cur.execute("SELECT id FROM suppliers WHERE name=%s", (s["name"],))
-                if cur.fetchone():
-                    continue
-                cur.execute("""INSERT INTO suppliers (name,contact_person,phone,address,description,status)
-                    VALUES (%s,%s,%s,%s,%s,%s)""",
-                    (s["name"], s["contact_person"], s["phone"], s["address"], s["description"], s["status"]))
-                count += 1
-            print(f"  {count} 个供应商就绪")
-
-            print("[5/8] 写入示例采购单 ...")
-            count = 0
-            for p in SAMPLE_PURCHASE_ORDERS:
-                cur.execute("SELECT id FROM purchase_orders WHERE order_no=%s", (p["order_no"],))
-                if cur.fetchone():
-                    continue
-                total = sum(item["quantity"] * item["price"] for item in p["items"])
-                cur.execute("""INSERT INTO purchase_orders
-                    (order_no,supplier_id,supplier_name,total_amount,status,remark,creator,creator_name,
-                     auditor,auditor_name,audit_time,in_stock_time)
-                    VALUES (%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s)""",
-                    (p["order_no"], p["supplier_id"], p["supplier_name"], round(total, 2), p["status"],
-                     p.get("remark"), p.get("creator"), p.get("creator_name"), p.get("auditor"),
-                     p.get("auditor_name"), p.get("audit_time"), p.get("in_stock_time")))
-                po_id = cur.lastrowid
-                for item in p["items"]:
-                    subtotal = round(item["quantity"] * item["price"], 2)
-                    received = item["quantity"] if p["status"] == "completed" else 0
-                    cur.execute("""INSERT INTO purchase_items
-                        (purchase_id,herb_code,herb_name,quantity,unit,price,subtotal,received_quantity)
-                        VALUES (%s,%s,%s,%s,%s,%s,%s,%s)""",
-                        (po_id, item["herb_code"], item["herb_name"], item["quantity"],
-                         item["unit"], item["price"], subtotal, received))
-                count += 1
-            print(f"  {count} 张采购单就绪")
-
-            print("[6/8] 写入示例处方 ...")
-            count = 0
+            print("[4/4] 写入示例处方 ...")
             for p in SAMPLE_PRESCRIPTIONS:
                 cur.execute("SELECT id FROM prescriptions WHERE prescription_no=%s", (p["prescription_no"],))
                 if cur.fetchone():
@@ -864,43 +712,10 @@ def _init_mysql():
                     dosage_val = float(str(item["dosage"]).replace("g", ""))
                     subtotal = round(dosage_val * item["quantity"] * item["price"], 2)
                     cur.execute("""INSERT INTO prescription_items
-                        (prescription_id,herb_code,herb_name,dosage, `usage`,quantity,price,subtotal)
+                        (prescription_id,herb_code,herb_name,dosage,usage,quantity,price,subtotal)
                         VALUES (%s,%s,%s,%s,%s,%s,%s,%s)""",
                         (rx_id, item["herb_code"], item["herb_name"], item["dosage"],
                          item["usage"], item["quantity"], item["price"], subtotal))
-                count += 1
-            print(f"  {count} 张处方就绪")
-
-            print("[7/8] 写入药材知识库 ...")
-            count = 0
-            for k in SAMPLE_HERB_KNOWLEDGE:
-                cur.execute("SELECT id FROM herb_knowledge WHERE herb_code=%s", (k["herb_code"],))
-                if cur.fetchone():
-                    continue
-                cur.execute("""INSERT INTO herb_knowledge
-                    (herb_code,herb_name,category,nature,flavor,meridian,effects,indications,
-                     dosage, `usage`,contraindications,compatibility)
-                    VALUES (%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s)""",
-                    (k["herb_code"], k["herb_name"], k["category"], k["nature"], k["flavor"],
-                     k["meridian"], k["effects"], k["indications"], k["dosage"], k["usage"],
-                     k["contraindications"], k["compatibility"]))
-                count += 1
-            print(f"  {count} 条药材知识就绪")
-
-            print("[8/8] 写入方剂库 ...")
-            count = 0
-            for f in SAMPLE_FORMULAS:
-                cur.execute("SELECT id FROM formulas WHERE name=%s", (f["name"],))
-                if cur.fetchone():
-                    continue
-                cur.execute("""INSERT INTO formulas
-                    (name,category,source,composition,effects,indications, `usage`,contraindications)
-                    VALUES (%s,%s,%s,%s,%s,%s,%s,%s)""",
-                    (f["name"], f["category"], f["source"], f["composition"], f["effects"],
-                     f["indications"], f["usage"], f["contraindications"]))
-                count += 1
-            print(f"  {count} 首方剂就绪")
-
         conn.commit()
     finally:
         conn.close()

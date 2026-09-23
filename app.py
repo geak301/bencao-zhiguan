@@ -1,5 +1,4 @@
 import re
-from urllib.parse import unquote
 # -*- coding: utf-8 -*-
 """
 本草智管平台 - 后端服务（Flask + MySQL）
@@ -20,10 +19,7 @@ from flask import Flask, jsonify, request, send_from_directory
 from db import execute, query, is_mysql
 
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
-# 前端目录自适应：标准结构为 ../frontend；PaaS 平铺部署（HTML 与 app.py 同目录）时直接用 BASE_DIR
 FRONTEND_DIR = os.path.join(BASE_DIR, "..", "frontend")
-if not os.path.isdir(FRONTEND_DIR):
-    FRONTEND_DIR = BASE_DIR
 DEFAULT_WARNING_THRESHOLD = 200
 
 app = Flask(__name__, static_folder=FRONTEND_DIR, static_url_path="")
@@ -43,7 +39,7 @@ def fail(message, code=1, http=200):
 
 
 def get_current_user():
-    username = unquote(request.headers.get("X-User", "")).strip()
+    username = request.headers.get("X-User", "").strip()
     if not username:
         return None
     return query("SELECT * FROM users WHERE username = %s", (username,), one=True)
@@ -240,21 +236,12 @@ def add_herb():
         return fail("请填写药材编码和名称")
     if query("SELECT 1 FROM herbs WHERE code = %s", (code,), one=True):
         return fail("已存在相同编码的药材")
-    init_qty = d.get("quantity", 0) or 0
     execute(
         """INSERT INTO herbs (code, name, category, origin, storage, unit, price, quantity, warning_threshold, description)
            VALUES (%s,%s,%s,%s,%s,%s,%s,%s,%s,%s)""",
         (code, name, d.get("category"), d.get("origin"), d.get("storage"), d.get("unit"),
-         d.get("price", 0), init_qty, d.get("warningThreshold", 200), d.get("description")),
+         d.get("price", 0), d.get("quantity", 0), d.get("warningThreshold", 200), d.get("description")),
     )
-    # 带初始库存的新建药材，自动记一条期初入库流水
-    if init_qty and int(init_qty) != 0:
-        add_stock_transaction(
-            code, name, "in", abs(int(init_qty)),
-            reference_type="adjust", reference_id=None,
-            remark="新建药材期初入库",
-            operator=user["username"], operator_name=user["name"],
-        )
     return ok(None, "药材添加成功")
 
 
@@ -269,67 +256,15 @@ def update_herb(code):
     old = query("SELECT * FROM herbs WHERE code = %s", (code,), one=True)
     if not old:
         return fail("药材不存在")
-    new_qty = d.get("quantity", old["quantity"])
     execute(
         """UPDATE herbs SET name=%s, category=%s, origin=%s, storage=%s, unit=%s,
            price=%s, quantity=%s, warning_threshold=%s, description=%s WHERE code=%s""",
         (d.get("name", old["name"]), d.get("category", old["category"]), d.get("origin", old["origin"]),
          d.get("storage", old["storage"]), d.get("unit", old["unit"]),
-         d.get("price", old["price"]), new_qty,
+         d.get("price", old["price"]), d.get("quantity", old["quantity"]),
          d.get("warningThreshold", old["warning_threshold"]), d.get("description", old["description"]), code),
     )
-    # 编辑时改了库存数量，记一条调整流水
-    try:
-        delta = int(new_qty) - int(old["quantity"] or 0)
-    except Exception:
-        delta = 0
-    if delta != 0:
-        add_stock_transaction(
-            code, old["name"], "in" if delta > 0 else "out",
-            abs(delta), reference_type="adjust", reference_id=None,
-            remark="编辑调整库存 %s -> %s" % (int(old["quantity"] or 0), int(new_qty)),
-            operator=user["username"], operator_name=user["name"],
-        )
     return ok(None, "药材更新成功")
-
-
-@app.route("/api/herbs/<code>/adjust", methods=["POST"])
-def adjust_herb(code):
-    user, err = require_login()
-    if err:
-        return err
-    if user["role"] == "patient":
-        return fail("无权限：病人角色为只读", code=403, http=403)
-    d = request.get_json(silent=True) or {}
-    try:
-        amount = int(d.get("amount", 0))
-    except (TypeError, ValueError):
-        return fail("调整数量不合法")
-    if amount == 0:
-        return fail("调整数量不能为 0")
-    herb = query("SELECT * FROM herbs WHERE code = %s", (code,), one=True)
-    if not herb:
-        return fail("药材不存在")
-    before = int(herb["quantity"] or 0)
-    if before + amount < 0:
-        return fail("库存不足：当前 %s，不能减 %s" % (before, -amount))
-    affected, _ = execute(
-        "UPDATE herbs SET quantity = quantity + %s WHERE code = %s AND quantity + %s >= 0",
-        (amount, code, amount),
-    )
-    if affected != 1:
-        return fail("库存调整失败")
-    after = before + amount
-    add_stock_transaction(
-        code, herb["name"], "in" if amount > 0 else "out",
-        abs(amount), reference_type="adjust", reference_id=None,
-        remark="人工调库 %+d（%s -> %s）" % (amount, before, after),
-        operator=user["username"], operator_name=user["name"],
-    )
-    add_log(code, herb["name"], "herb_adjust",
-            {"before": before, "after": after, "amount": amount},
-            user["username"], user["name"])
-    return ok({"quantity": after}, "库存调整成功")
 
 
 @app.route("/api/herbs/<code>", methods=["DELETE"])
@@ -417,6 +352,130 @@ def toggle_user_status(username):
     new_status = "inactive" if user["status"] == "active" else "active"
     execute("UPDATE users SET status = %s WHERE username = %s", (new_status, username))
     return ok({"status": new_status}, "已" + ("禁用" if new_status == "inactive" else "启用") + "该账号")
+
+
+@app.route("/api/users", methods=["POST"])
+def create_user():
+    _, err = require_admin()
+    if err:
+        return err
+    data = request.get_json(silent=True) or {}
+    username = (data.get("username") or "").strip()
+    password = data.get("password") or ""
+    name = (data.get("name") or "").strip()
+    role = (data.get("role") or "patient").strip()
+    phone = (data.get("phone") or "").strip()
+    status = (data.get("status") or "active").strip()
+    department = (data.get("department") or "").strip()
+    license_no = (data.get("license") or "").strip()
+    gender = (data.get("gender") or "").strip()
+    age = data.get("age")
+
+    if not username or not password or not name:
+        return fail("用户名、密码、真实姓名为必填项")
+    if role not in ("admin", "doctor", "patient"):
+        return fail("角色类型无效")
+    if status not in ("active", "inactive", "pending"):
+        return fail("账号状态无效")
+
+    existing = query("SELECT username FROM users WHERE username = %s", (username,), one=True)
+    if existing:
+        return fail("该用户名已存在")
+
+    age_val = None
+    if age is not None and str(age).strip():
+        try:
+            age_val = int(age)
+        except (ValueError, TypeError):
+            age_val = None
+
+    sql_insert = (
+        "INSERT INTO users (username, password, role, name, phone, status, department, "
+        "license, gender, age, create_time) VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)"
+    )
+    execute(sql_insert, (username, sha256_pwd(password), role, name, phone, status,
+                         department, license_no, gender, age_val,
+                         time.strftime("%Y/%m/%d %H:%M:%S")))
+    return ok(None, "用户添加成功")
+
+
+@app.route("/api/users/<username>", methods=["PUT"])
+def update_user(username):
+    _, err = require_admin()
+    if err:
+        return err
+    data = request.get_json(silent=True) or {}
+
+    user = query("SELECT * FROM users WHERE username = %s", (username,), one=True)
+    if not user:
+        return fail("用户不存在")
+
+    fields = []
+    vals = []
+
+    if data.get("password"):
+        fields.append("password = %s")
+        vals.append(sha256_pwd(data["password"]))
+    if data.get("name"):
+        fields.append("name = %s")
+        vals.append(data["name"].strip())
+    if data.get("role"):
+        role = data["role"].strip()
+        if role not in ("admin", "doctor", "patient"):
+            return fail("角色类型无效")
+        fields.append("role = %s")
+        vals.append(role)
+    if "phone" in data:
+        fields.append("phone = %s")
+        vals.append((data.get("phone") or "").strip())
+    if data.get("status"):
+        status = data["status"].strip()
+        if status not in ("active", "inactive", "pending"):
+            return fail("账号状态无效")
+        fields.append("status = %s")
+        vals.append(status)
+    if "department" in data:
+        fields.append("department = %s")
+        vals.append((data.get("department") or "").strip())
+    if "license" in data:
+        fields.append("license = %s")
+        vals.append((data.get("license") or "").strip())
+    if "gender" in data:
+        fields.append("gender = %s")
+        vals.append((data.get("gender") or "").strip())
+    if "age" in data:
+        age_val = None
+        if data.get("age") is not None and str(data["age"]).strip():
+            try:
+                age_val = int(data["age"])
+            except (ValueError, TypeError):
+                age_val = None
+        fields.append("age = %s")
+        vals.append(age_val)
+
+    if not fields:
+        return fail("没有需要更新的字段")
+
+    vals.append(username)
+    sql = "UPDATE users SET " + ", ".join(fields) + " WHERE username = %s"
+    execute(sql, tuple(vals))
+    return ok(None, "用户信息更新成功")
+
+
+@app.route("/api/users/<username>", methods=["DELETE"])
+def delete_user(username):
+    _, err = require_admin()
+    if err:
+        return err
+    if username == "admin":
+        return fail("不能删除超级管理员账号")
+
+    user = query("SELECT username FROM users WHERE username = %s", (username,), one=True)
+    if not user:
+        return fail("用户不存在")
+
+    execute("DELETE FROM users WHERE username = %s", (username,))
+    return ok(None, "用户删除成功")
 
 
 # ============ 日志接口 ============
@@ -546,7 +605,7 @@ def create_prescription():
         subtotal = round(dosage_val * qty * price, 2)
         execute(
             """INSERT INTO prescription_items
-               (prescription_id, herb_code, herb_name, dosage, `usage`, quantity, price, subtotal)
+               (prescription_id, herb_code, herb_name, dosage, usage, quantity, price, subtotal)
                VALUES (%s,%s,%s,%s,%s,%s,%s,%s)""",
             (rx_id, item.get("herbCode"), item.get("herbName"), item.get("dosage"),
              item.get("usage"), qty, price, subtotal),
@@ -1241,10 +1300,10 @@ def detect_intent(message):
 
 def query_herb_knowledge(herb_name):
     """查询药材知识"""
-    herb = query("SELECT * FROM herb_knowledge WHERE herb_name = %s", (herb_name,), one=True)
+    herb = query("SELECT * FROM herb_knowledge WHERE herb_name = ?", (herb_name,), one=True)
     if not herb:
         # 模糊匹配
-        herb = query("SELECT * FROM herb_knowledge WHERE herb_name LIKE %s", (f"%{herb_name}%",), one=True)
+        herb = query("SELECT * FROM herb_knowledge WHERE herb_name LIKE ?", (f"%{herb_name}%",), one=True)
     return herb
 
 
@@ -1271,9 +1330,9 @@ def format_herb_card(herb):
 
 def query_formula(formula_name):
     """查询方剂"""
-    formula = query("SELECT * FROM formulas WHERE name = %s", (formula_name,), one=True)
+    formula = query("SELECT * FROM formulas WHERE name = ?", (formula_name,), one=True)
     if not formula:
-        formula = query("SELECT * FROM formulas WHERE name LIKE %s", (f"%{formula_name}%",), one=True)
+        formula = query("SELECT * FROM formulas WHERE name LIKE ?", (f"%{formula_name}%",), one=True)
     return formula
 
 
@@ -1522,7 +1581,7 @@ def chat():
         if user["role"] == "patient":
             # 患者查询自己的处方
             prescriptions = query(
-                "SELECT * FROM prescriptions WHERE patient_name = %s OR patient_phone = %s ORDER BY id DESC LIMIT 5",
+                "SELECT * FROM prescriptions WHERE patient_name = ? OR patient_phone = ? ORDER BY id DESC LIMIT 5",
                 (user["name"], user.get("phone", ""))
             )
             if prescriptions:
@@ -1569,7 +1628,7 @@ def chat():
     # 保存对话历史
     try:
         execute("""INSERT INTO chat_history (username, role, user_message, assistant_reply, intent)
-                   VALUES (%s,%s,%s,%s,%s)""",
+                   VALUES (?,?,?,?,?)""",
                 (user["username"], user["role"], message, reply, intent))
     except Exception:
         pass  # 历史记录保存失败不影响主流程
@@ -1588,9 +1647,9 @@ def herb_knowledge_detail(code):
     user, err = require_login()
     if err:
         return err
-    herb = query("SELECT * FROM herb_knowledge WHERE herb_code = %s", (code,), one=True)
+    herb = query("SELECT * FROM herb_knowledge WHERE herb_code = ?", (code,), one=True)
     if not herb:
-        herb = query("SELECT * FROM herb_knowledge WHERE herb_name = %s", (code,), one=True)
+        herb = query("SELECT * FROM herb_knowledge WHERE herb_name = ?", (code,), one=True)
     if not herb:
         return fail("未找到该药材知识")
     return ok(format_herb_card(herb))
@@ -1604,7 +1663,7 @@ def list_formulas():
         return err
     keyword = request.args.get("keyword", "").strip()
     if keyword:
-        formulas = query("SELECT * FROM formulas WHERE name LIKE %s OR effects LIKE %s OR indications LIKE %s",
+        formulas = query("SELECT * FROM formulas WHERE name LIKE ? OR effects LIKE ? OR indications LIKE ?",
                          (f"%{keyword}%", f"%{keyword}%", f"%{keyword}%"))
     else:
         formulas = query("SELECT * FROM formulas ORDER BY id")
@@ -1618,7 +1677,7 @@ def chat_history():
     if err:
         return err
     limit = int(request.args.get("limit", 20))
-    history = query("SELECT * FROM chat_history WHERE username = %s ORDER BY id DESC LIMIT %s",
+    history = query("SELECT * FROM chat_history WHERE username = ? ORDER BY id DESC LIMIT ?",
                     (user["username"], limit))
     return ok({"total": len(history), "items": history})
 

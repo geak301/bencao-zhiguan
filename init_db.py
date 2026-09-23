@@ -13,7 +13,7 @@ import time
 
 from db import is_mysql, execute, query, SQLITE_DB_PATH
 
-DB_NAME = os.environ.get("DB_NAME") or os.environ.get("MYSQLDATABASE") or "herb_management_system"
+DB_NAME = "herb_management_system"
 
 
 # ============ SQLite 建表语句 ============
@@ -682,7 +682,7 @@ def _init_mysql():
                 """CREATE TABLE IF NOT EXISTS prescription_items (
                     id INT AUTO_INCREMENT PRIMARY KEY, prescription_id INT NOT NULL,
                     herb_code VARCHAR(50), herb_name VARCHAR(50) NOT NULL, dosage VARCHAR(30),
-                    usage VARCHAR(100), quantity INT DEFAULT 1, price DECIMAL(10,2) DEFAULT 0,
+                    `usage` VARCHAR(100), quantity INT DEFAULT 1, price DECIMAL(10,2) DEFAULT 0,
                     subtotal DECIMAL(10,2) DEFAULT 0, INDEX idx_prescription (prescription_id)
                 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4""",
             ]
